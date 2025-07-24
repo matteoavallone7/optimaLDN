@@ -1,0 +1,10 @@
+go 1.23.3
+
+use (
+	./src/common
+	./src/notification
+	./src/rabbitmq
+	./src/routeplanner
+	./src/traffic_delays
+	./src/user_service
+)

@@ -40,7 +40,13 @@ const (
 	bindingKey                       = "route.update.#"
 )
 
-func (r *RoutePlanner) ServeRequest(args *common.UserRequest, reply *common.RouteResult) error {
+func failOnError(err error, msg string) {
+	if err != nil {
+		log.Fatalf("%s: %s", msg, err)
+	}
+}
+
+func (r *RoutePlanner) ServeRequest(ctx context.Context, args *common.UserRequest, reply *common.RouteResult) error {
 
 	fmt.Printf("Requested route from '%s' to '%s'\n", args.StartPoint, args.EndPoint)
 	fmt.Println("Acquiring start-point NapTan code..")
@@ -81,9 +87,12 @@ func (r *RoutePlanner) ServeRequest(args *common.UserRequest, reply *common.Rout
 	if okNotif := notifyNewRoute(args.UserID, bestJourney); okNotif != nil {
 		return fmt.Errorf("failed to publish new active route: %w", err)
 	}
-
 	log.Println("New active route notification published successfully.")
 
+	chosen := ConvertToChosenRoute(args.UserID, bestJourney)
+	if err := SaveChosenRoute(ctx, chosen); err != nil {
+		log.Printf("Error saving chosen route: %v", err)
+	}
 	return nil
 }
 
@@ -93,8 +102,8 @@ func (r *RoutePlanner) RecalculateRoute(args *common.NewRequest, reply *common.R
 	// prendi dati rotta attuale per creare active route da mandare a notif (non data che sta sotto!!)
 	// avvisa notif service che la rotta non è piu valida
 	data, _ := json.Marshal(args)
-	if err := PublishMsg(routeTerminated, data); err != nil {
-		return fmt.Errorf("failed to publish terminated route: %w", err)
+	if err := routePublisher.Publish(routeTerminated, data, amqp.Table{"Event-Type": "Route Aborted"}); err != nil {
+		return fmt.Errorf("failed to publish aborted route: %w", err)
 	}
 	log.Println("Terminated route notification published successfully.")
 
@@ -106,7 +115,7 @@ func (r *RoutePlanner) TerminateRoute(args *common.NewRequest, reply *common.Sav
 
 	fmt.Printf("Request received from '%s' to '%s'\n", args.UserID, args.Reason)
 	data, _ := json.Marshal(args)
-	if err := PublishMsg(routeTerminated, data); err != nil {
+	if err := routePublisher.Publish(routeTerminated, data, amqp.Table{"Event-Type": "Route Terminated"}); err != nil {
 		return fmt.Errorf("failed to publish terminated route: %w", err)
 	}
 	log.Println("Terminated route notification published successfully.")
@@ -130,7 +139,7 @@ func (r *RoutePlanner) AcceptSavedRouteRequest(args *common.UserSavedRoute, repl
 	reply.Status = common.StatusDone
 
 	data, _ := json.Marshal(activeRoute)
-	if err := PublishMsg(routeCreated, data); err != nil {
+	if err := routePublisher.Publish(routeCreated, data, amqp.Table{"Event-Type": "Route Created"}); err != nil {
 		return fmt.Errorf("failed to publish saved active route: %w", err)
 	}
 
@@ -155,7 +164,7 @@ func notifyNewRoute(user string, journey common.TFLJourney) error {
 	data, _ := json.Marshal(newRoute)
 
 	if err := routePublisher.Publish(routeCreated, data, amqp.Table{"Event-Type": "Route Created"}); err != nil {
-		return err
+		return fmt.Errorf("failed to publish new active route: %w", err)
 	}
 
 	return nil
@@ -242,7 +251,10 @@ func loadNapTanFile(filename string) (map[string]string, error) {
 func main() {
 	fmt.Println("Starting Route planner service...")
 
-	cfg, err := config.LoadDefaultConfig(context.TODO())
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	cfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
 		log.Fatalf("Failed to load AWS config: %v", err)
 	}
@@ -290,8 +302,6 @@ func main() {
 		}
 	}()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 

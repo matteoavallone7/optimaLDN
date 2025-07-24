@@ -127,6 +127,7 @@ type StopPointRef struct {
 }
 
 type ChosenRoute struct {
+	UserID        string
 	TotalDuration int
 	Description   string
 	Legs          []RouteLeg
