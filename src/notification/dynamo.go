@@ -7,9 +7,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/matteoavallone7/optimaLDN/src/common"
 	"github.com/patrickmn/go-cache"
 	"log"
-	"optimaLDN/src/common"
 )
 
 func CheckActiveRoutes(ctx context.Context, lineName string) (bool, []string) {
@@ -63,7 +63,7 @@ func CheckActiveRoutes(ctx context.Context, lineName string) (bool, []string) {
 	return len(foundUserIDs) > 0, foundUserIDs
 }
 
-func RegisterNewRoute(route common.ActiveRoute) error {
+func RegisterNewRoute(ctx context.Context, route common.ActiveRoute) error {
 	item, err := attributevalue.MarshalMap(route)
 	if err != nil {
 		return fmt.Errorf("failed to marshal ActiveRoute: %w", err)
@@ -74,14 +74,14 @@ func RegisterNewRoute(route common.ActiveRoute) error {
 		Item:      item,
 	}
 
-	_, err = dbClient.PutItem(context.TODO(), input)
+	_, err = dbClient.PutItem(ctx, input)
 	if err != nil {
 		return fmt.Errorf("failed to write ActiveRoute to DynamoDB: %w", err)
 	}
 	return nil
 }
 
-func DeleteActiveRoute(route common.ActiveRoute) (*common.ActiveRoute, error) {
+func DeleteActiveRoute(ctx context.Context, route common.ActiveRoute) (*common.ActiveRoute, error) {
 	key, err := attributevalue.MarshalMap(map[string]string{
 		"UserID": route.UserID,
 	})
@@ -95,7 +95,7 @@ func DeleteActiveRoute(route common.ActiveRoute) (*common.ActiveRoute, error) {
 		ReturnValues: types.ReturnValueAllOld, // Ensure deleted item is returned
 	}
 
-	result, err := dbClient.DeleteItem(context.TODO(), input)
+	result, err := dbClient.DeleteItem(ctx, input)
 	if err != nil {
 		return nil, fmt.Errorf("failed to delete active route for user %s: %w", route.UserID, err)
 	}

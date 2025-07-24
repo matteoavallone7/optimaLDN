@@ -8,9 +8,9 @@ import (
 	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
 	"github.com/influxdata/influxdb-client-go/v2/api"
 	"github.com/influxdata/influxdb-client-go/v2/api/write"
+	"github.com/matteoavallone7/optimaLDN/src/common"
 	"log"
 	"net/http"
-	"optimaLDN/src/common"
 	"os"
 	"time"
 )

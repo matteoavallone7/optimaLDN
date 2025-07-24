@@ -8,13 +8,13 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/joho/godotenv"
+	"github.com/matteoavallone7/optimaLDN/src/common"
+	"github.com/matteoavallone7/optimaLDN/src/rabbitmq"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"log"
 	"math"
 	"net"
 	"net/rpc"
-	"optimaLDN/src/common"
-	"optimaLDN/src/rabbitmq"
 	"os"
 	"os/signal"
 	"strings"
@@ -28,6 +28,7 @@ type RoutePlanner struct{}
 var routePublisher *rabbitmq.Publisher
 var dbClient *dynamodb.Client
 var tflAPIKey string
+var NaptanMap = make(map[string]string)
 
 const (
 	routeCreated                     = "active.route.created"
@@ -38,10 +39,6 @@ const (
 	notificationQueueName            = "notifications_queue"
 	bindingKey                       = "route.update.#"
 )
-
-var channel *amqp.Channel
-var cleanup func() error
-var NaptanMap = make(map[string]string)
 
 func (r *RoutePlanner) ServeRequest(args *common.UserRequest, reply *common.RouteResult) error {
 
@@ -157,7 +154,7 @@ func notifyNewRoute(user string, journey common.TFLJourney) error {
 	newRoute.LineIDs = lines
 	data, _ := json.Marshal(newRoute)
 
-	if err := PublishMsg(routeCreated, data); err != nil {
+	if err := routePublisher.Publish(routeCreated, data, amqp.Table{"Event-Type": "Route Created"}); err != nil {
 		return err
 	}
 
@@ -321,7 +318,7 @@ func main() {
 			server.Accept(listener)
 		}
 	}()
-	
+
 	<-sigChan
 	log.Println("Shutdown signal received. Stopping consumers...")
 

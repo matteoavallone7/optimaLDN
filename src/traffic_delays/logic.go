@@ -3,7 +3,7 @@ package traffic_delays
 import (
 	"context"
 	"fmt"
-	"optimaLDN/src/common"
+	"github.com/matteoavallone7/optimaLDN/src/common"
 )
 
 func ExecuteAndProcessQuery(ctx context.Context, fluxQuery string, alertType string) ([]common.TfLAlert, error) {
