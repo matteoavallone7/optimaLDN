@@ -8,13 +8,17 @@ import (
 	"time"
 )
 
-func FetchRoutes(from, to, date string, journeyTime time.Time) (*common.TFLJourneyResponse, error) {
+func FetchRoutes(from, to string, departure time.Time) (*common.TFLJourneyResponse, error) {
+
+	formattedDate := departure.Format("20060102")
+	formattedTime := departure.Format("15:04")
+
 	url := fmt.Sprintf(
 		"https://api.tfl.gov.uk/Journey/JourneyResults/%s/to/%s?date=%s&time=%s&timeIs=Departing&app_key=%s",
 		from,
 		to,
-		date,
-		journeyTime.Format("1504"),
+		formattedDate,
+		formattedTime,
 		tflAPIKey,
 	)
 

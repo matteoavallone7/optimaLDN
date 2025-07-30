@@ -41,51 +41,46 @@ func GetScore(totalCrowding float64, totalStops, duration int) float64 {
 	return float64(duration) * (1 + avgCrowding)
 }
 
-/* func EstimateCurrentStop(journey common.TFLJourney, startTime time.Time) string {
+func EstimateCurrentStop(route common.ChosenRoute) (string, error) {
 	now := time.Now()
-	elapsed := now.Sub(startTime)
 
-	var timePassed int
-	for _, leg := range journey.Legs {
-		timePassed += leg. * 60 // seconds
-		if elapsed.Seconds() < float64(timePassed) {
-			return leg.DeparturePoint.NaptanID
-		}
+	// 1. Check if journey is already completed
+	if len(route.Legs) == 0 {
+		return "", fmt.Errorf("no legs in the route")
 	}
-	return journey.Legs[len(journey.Legs)-1].ArrivalPoint.NaptanID // Last stop
-}*/
+	lastLeg := route.Legs[len(route.Legs)-1]
+	journeyEndTime, err := time.Parse(time.RFC3339, lastLeg.EndTime)
+	if err == nil && now.After(journeyEndTime) {
+		return "", fmt.Errorf("journey already completed")
+	}
 
-func EstimateCurrentStop(journey common.TFLJourney, journeyStart time.Time) (string, error) {
-	now := time.Now()
-	for _, leg := range journey.Legs {
-		depTime, err := time.Parse(time.RFC3339, leg.DepartureTime)
-		if err != nil {
-			continue
-		}
-		arrTime, err := time.Parse(time.RFC3339, leg.ArrivalTime)
-		if err != nil {
-			continue
+	// 2. Iterate over legs and find current one based on time
+	for _, leg := range route.Legs {
+		depTime, err1 := time.Parse(time.RFC3339, leg.StartTime)
+		arrTime, err2 := time.Parse(time.RFC3339, leg.EndTime)
+
+		if err1 != nil || err2 != nil {
+			continue // Skip legs with invalid timestamps
 		}
 
-		// If current time is within this leg's window
-		if now.After(depTime) && now.Before(arrTime) {
-			// Estimate mid-point stop as current
-			mid := len(leg.Path.StopPoints) / 2
-			if mid >= 0 && mid < len(leg.Path.StopPoints) {
-				return leg.Path.StopPoints[mid].ID, nil
+		// Check if 'now' is within the current leg's time frame (inclusive of start, exclusive of end)
+		// Using !now.Before(depTime) is equivalent to now.After(depTime) || now.Equal(depTime)
+		if !now.Before(depTime) && now.Before(arrTime) {
+			// 3. Estimate current stop based on progress through this leg
+			if len(leg.StopIDs) == 0 {
+				return "", fmt.Errorf("no stops available in current leg")
 			}
+
+			progress := now.Sub(depTime).Seconds() / arrTime.Sub(depTime).Seconds()
+			index := int(progress * float64(len(leg.StopIDs)))
+			if index >= len(leg.StopIDs) {
+				index = len(leg.StopIDs) - 1 // Clamp to last index
+			}
+			return leg.StopIDs[index], nil
 		}
 	}
 
-	// If time is past journey duration, return last stop
-	if len(journey.Legs) > 0 {
-		lastLeg := journey.Legs[len(journey.Legs)-1]
-		if len(lastLeg.Path.StopPoints) > 0 {
-			return lastLeg.Path.StopPoints[len(lastLeg.Path.StopPoints)-1].ID, nil
-		}
-	}
-
-	return "", fmt.Errorf("unable to estimate current stop")
+	return "", fmt.Errorf("unable to estimate current stop from time range")
 }
 
 func ConvertToChosenRoute(userID string, tflJourney common.TFLJourney) common.ChosenRoute {
@@ -128,5 +123,23 @@ func ConvertToChosenRoute(userID string, tflJourney common.TFLJourney) common.Ch
 		TotalDuration: tflJourney.Duration,
 		Description:   fmt.Sprintf("Journey with %d legs", len(tflJourney.Legs)),
 		Legs:          legs,
+	}
+}
+
+func ConvertToActiveRoute(userID string, route *common.ChosenRoute) *common.ActiveRoute {
+	// Extract all line IDs from the route
+	lineNameSet := make(map[string]struct{})
+	for _, leg := range route.Legs {
+		lineNameSet[leg.LineName] = struct{}{}
+	}
+
+	var lineIDs []string
+	for id := range lineNameSet {
+		lineIDs = append(lineIDs, id)
+	}
+
+	return &common.ActiveRoute{
+		UserID:  userID,
+		LineIDs: lineIDs,
 	}
 }

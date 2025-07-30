@@ -149,8 +149,8 @@ func main() {
 	trafficHandler := func(delivery amqp.Delivery) bool {
 		log.Printf("[Notification Service] Received Delay Event: %s (Key: %s)", string(delivery.Body), delivery.RoutingKey)
 		var payload common.NotificationPayload
-		err := json.Unmarshal(delivery.Body, &payload)
-		failOnError(err, "Failed to unmarshal notification payload")
+		err1 := json.Unmarshal(delivery.Body, &payload)
+		failOnError(err1, "Failed to unmarshal notification payload")
 		log.Printf("[Notification Service] Received Payload: %s, Alerts: %s, Generated: %s", payload.AlertType, len(payload.Alerts), payload.GeneratedAt)
 		switch payload.AlertType {
 		case "CriticalDelay":

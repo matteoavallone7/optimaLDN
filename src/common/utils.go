@@ -3,11 +3,15 @@ package common
 import "time"
 
 type UserRequest struct {
-	UserID        string
-	StartPoint    string
-	EndPoint      string
-	DepartureDate string // yyyyMMdd format
-	DepartureTime time.Time
+	UserID     string
+	StartPoint string
+	EndPoint   string
+	Departure  time.Time
+}
+
+type RouteLookup struct {
+	UserID  string
+	RouteID string
 }
 
 type UserSavedRoute struct {
@@ -177,4 +181,9 @@ type SavedResp struct {
 type NewRequest struct {
 	UserID string
 	Reason string
+}
+
+type Auth struct {
+	UserID   string
+	Password string
 }

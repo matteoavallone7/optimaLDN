@@ -11,9 +11,9 @@ import (
 	"log"
 )
 
-func GetActiveRoute(ctx context.Context, userID string) (*common.ActiveRoute, error) {
+func GetActiveRoute(ctx context.Context, userID string) (*common.ChosenRoute, error) {
 	input := &dynamodb.GetItemInput{
-		TableName: aws.String("ActiveRoutes"),
+		TableName: aws.String("ChosenRoutes"),
 		Key: map[string]types.AttributeValue{
 			"UserID": &types.AttributeValueMemberS{Value: userID},
 		},
@@ -28,7 +28,7 @@ func GetActiveRoute(ctx context.Context, userID string) (*common.ActiveRoute, er
 		return nil, fmt.Errorf("no active route found for user %s", userID)
 	}
 
-	var route common.ActiveRoute
+	var route common.ChosenRoute
 	err = attributevalue.UnmarshalMap(result.Item, &route)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal route: %w", err)
@@ -54,5 +54,27 @@ func SaveChosenRoute(ctx context.Context, route common.ChosenRoute) error {
 	}
 
 	log.Printf("Saved chosen route for user %s with %d legs.", route.UserID, len(route.Legs))
+	return nil
+}
+
+func DeleteChosenRoute(ctx context.Context, userID string) error {
+	key, err := attributevalue.MarshalMap(map[string]string{
+		"UserID": userID,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to marshal key: %w", err)
+	}
+
+	input := &dynamodb.DeleteItemInput{
+		TableName: aws.String("ChosenRoutes"),
+		Key:       key,
+	}
+
+	_, err = dbClient.DeleteItem(ctx, input)
+	if err != nil {
+		return fmt.Errorf("failed to delete route for user %s: %w", userID, err)
+	}
+
+	log.Printf("Deleted chosen route for user %s", userID)
 	return nil
 }

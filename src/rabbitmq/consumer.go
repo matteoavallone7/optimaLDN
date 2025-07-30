@@ -71,7 +71,7 @@ func (c *Consumer) StartConsume(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			log.Println("Consumer received shutdown signal. Exiting consume loop.")
-			return // Exit the StartConsume method
+			return
 
 		default:
 			// Execute the consume operation through the circuit breaker.
