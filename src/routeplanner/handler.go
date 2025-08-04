@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/matteoavallone7/optimaLDN/src/common"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -60,4 +61,14 @@ func FetchCrowding(naptan, weekday string) (*common.CrowdingResp, error) {
 		return nil, err
 	}
 	return &data, nil
+}
+
+func NotifyUser(userID, msg string) {
+	_, err := http.PostForm("http://api-gateway/send-notification", url.Values{
+		"userID": {userID},
+		"msg":    {msg},
+	})
+	if err != nil {
+		return
+	}
 }

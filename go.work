@@ -7,4 +7,6 @@ use (
 	./src/routeplanner
 	./src/traffic_delays
 	./src/user_service
+	./src/api-gateway
+	./cmd
 )

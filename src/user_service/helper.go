@@ -3,6 +3,8 @@ package user_service
 import (
 	"github.com/google/uuid"
 	"github.com/matteoavallone7/optimaLDN/src/common"
+	"net/http"
+	"net/url"
 )
 
 func ConvertToUserSavedRoute(userID string, chosen common.ChosenRoute) common.UserSavedRoute {
@@ -24,5 +26,15 @@ func ConvertToUserSavedRoute(userID string, chosen common.ChosenRoute) common.Us
 		EstimatedTime: chosen.TotalDuration,
 		LineNames:     lineNames,
 		StopsNames:    stopsNames,
+	}
+}
+
+func NotifyUser(userID, msg string) {
+	_, err := http.PostForm("http://api-gateway/send-notification", url.Values{
+		"userID": {userID},
+		"msg":    {msg},
+	})
+	if err != nil {
+		return
 	}
 }

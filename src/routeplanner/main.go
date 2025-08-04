@@ -418,6 +418,8 @@ func main() {
 			return false
 		}
 
+		NotifyUser(payload.UserID, "🛑 Critical delay! Route recalculated:\n"+buildSummary(bestJourney))
+
 		return true
 	}
 

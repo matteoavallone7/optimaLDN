@@ -48,8 +48,8 @@ func handleCriticalDelay(ctx context.Context, payload common.NotificationPayload
 			for _, userID := range userIDs {
 				msg := fmt.Sprintf("Line %s for user %s is experiencing critical delays.", alert.LineName, userID)
 				req := common.NewRequest{
-					userID,
-					msg,
+					UserID: userID,
+					Reason: msg,
 				}
 				data, err := json.Marshal(req)
 				failOnError(err, "Failed to marshal critical delay json")

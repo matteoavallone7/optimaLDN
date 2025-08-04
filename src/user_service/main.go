@@ -2,6 +2,7 @@ package user_service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/matteoavallone7/optimaLDN/src/common"
@@ -35,7 +36,7 @@ func failOnError(err error, msg string) {
 	}
 }
 
-func (u *UserService) authenticateUser(ctx context.Context, args *common.Auth, reply *common.SavedResp) error {
+func (u *UserService) AuthenticateUser(ctx context.Context, args *common.Auth, reply *common.SavedResp) error {
 	var passwordHash string
 	query := `SELECT password_hash FROM users WHERE username = $1`
 
@@ -210,6 +211,15 @@ func main() {
 	failOnError(err, fmt.Sprintf("Failed to declare and bind queue '%s' for Notification Service", notificationsQueue))
 
 	userHandler := func(delivery amqp.Delivery) bool {
+		log.Printf("[User Service] Received Delay Event: %s (Key: %s)", string(delivery.Body), delivery.RoutingKey)
+		var payload common.NewRequest
+		err2 := json.Unmarshal(delivery.Body, &payload)
+		if err2 != nil {
+			log.Printf("[Route Planner Service] Failed to unmarshal New Request: %v", err2)
+			return false
+		}
+
+		NotifyUser(payload.UserID, "⚠️ Sudden delay on your route. Recalculate? (y/n)")
 
 		return true
 	}
