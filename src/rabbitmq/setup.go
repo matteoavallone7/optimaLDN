@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	MQURL                = "amqp://guest:guest@localhost:5672/"
+	MQURL                = "amqp://guest:guest@rabbitmq:5672/"
 	MaxConnectionRetries = 5
 )
 

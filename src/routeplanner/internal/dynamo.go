@@ -1,4 +1,4 @@
-package routeplanner
+package internal
 
 import (
 	"context"
@@ -19,7 +19,7 @@ func GetActiveRoute(ctx context.Context, userID string) (*common.ChosenRoute, er
 		},
 	}
 
-	result, err := dbClient.GetItem(ctx, input)
+	result, err := DBClient.GetItem(ctx, input)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get active route: %w", err)
 	}
@@ -48,7 +48,7 @@ func SaveChosenRoute(ctx context.Context, route common.ChosenRoute) error {
 		Item:      item,
 	}
 
-	_, err = dbClient.PutItem(ctx, input)
+	_, err = DBClient.PutItem(ctx, input)
 	if err != nil {
 		return fmt.Errorf("failed to save route to DynamoDB: %w", err)
 	}
@@ -70,7 +70,7 @@ func DeleteChosenRoute(ctx context.Context, userID string) error {
 		Key:       key,
 	}
 
-	_, err = dbClient.DeleteItem(ctx, input)
+	_, err = DBClient.DeleteItem(ctx, input)
 	if err != nil {
 		return fmt.Errorf("failed to delete route for user %s: %w", userID, err)
 	}

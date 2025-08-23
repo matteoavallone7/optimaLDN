@@ -1,4 +1,4 @@
-package traffic_delays
+package main
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"github.com/influxdata/influxdb-client-go/v2/api"
 	"github.com/matteoavallone7/optimaLDN/src/common"
 	"github.com/matteoavallone7/optimaLDN/src/rabbitmq"
+	"github.com/matteoavallone7/optimaLDN/src/traffic_delays/internal"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"log"
 	"os"
@@ -15,8 +16,6 @@ import (
 	"sync"
 	"syscall"
 	"time"
-
-	"github.com/joho/godotenv"
 )
 
 const (
@@ -59,7 +58,7 @@ func startDelayMonitor(ctx context.Context, newPublisher *rabbitmq.Publisher) {
 		  |> keep(columns: ["_time", "line_name", "mode_name", "status_severity_description", "reason"])
 	`, influBucket)
 
-			criticalDelayMessages, err := ExecuteAndProcessQuery(ctx, criticalDelaysQuery, "Critical Delay")
+			criticalDelayMessages, err := internal.ExecuteAndProcessQuery(ctx, criticalDelaysQuery, "Critical Delay")
 			if err != nil {
 				failOnError(err, "Error processing critical delays")
 			}
@@ -75,7 +74,7 @@ func startDelayMonitor(ctx context.Context, newPublisher *rabbitmq.Publisher) {
 		  |> keep(columns: ["_time", "line_name", "mode_name", "_value"])
 	`, influBucket)
 
-			suddenDropMessages, err := ExecuteAndProcessQuery(ctx, suddenDropQuery, "Sudden Service Worsening")
+			suddenDropMessages, err := internal.ExecuteAndProcessQuery(ctx, suddenDropQuery, "Sudden Service Worsening")
 			if err != nil {
 				failOnError(err, "Error processing sudden severity drops")
 			}
@@ -138,12 +137,12 @@ func startDelayMonitor(ctx context.Context, newPublisher *rabbitmq.Publisher) {
 func main() {
 	fmt.Println("Starting Traffic_delays service...")
 
-	if os.Getenv("APP_ENV") != "production" {
+	/* if os.Getenv("APP_ENV") != "production" {
 		err := godotenv.Load()
 		if err != nil {
 			failOnError(err, "Warning: Could not load .env file. Assuming environment variables are set externally")
 		}
-	}
+	} */
 
 	influDBUrl = os.Getenv("INFLUXDB_URL")
 	influOrg = os.Getenv("INFLUXDB_ORG")
@@ -155,8 +154,8 @@ func main() {
 	}
 
 	if influClient == nil {
-		influClient = influxdb2.NewClient(influxDBUrl, influxDBToken)
-		influxQueryAPI = influClient.QueryAPI(influxOrg) // <-- Initialized here
+		influClient = influxdb2.NewClient(influDBUrl, influDBToken)
+		internal.InfluxQueryAPI = influClient.QueryAPI(influOrg) // <-- Initialized here
 		log.Println("InfluxDB query client initialized.")
 	}
 	defer influClient.Close()

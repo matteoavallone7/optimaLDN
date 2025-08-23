@@ -1,4 +1,4 @@
-package user_service
+package logic
 
 import (
 	"github.com/google/uuid"

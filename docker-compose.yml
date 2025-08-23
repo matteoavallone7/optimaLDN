@@ -1,0 +1,132 @@
+
+services:
+  postgres:
+    image: postgres:15
+    restart: always
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: optimaldn
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgresql/:/docker-entrypoint-initdb.d/
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U admin -d optimaldn" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672" # management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: [ "CMD", "rabbitmq-diagnostics", "check_running" ]
+      interval: 5s
+      timeout: 10s
+      retries: 5
+      start_period: 5s
+
+  user_service:
+    platform: linux/arm64
+    build:
+      context: .
+      dockerfile: src/docker/user_service.Dockerfile
+    env_file:
+      - ./src/.env
+    environment:
+      - US_PORT=5001
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=admin
+      - DB_PASSWORD=password
+      - DB_NAME=optimaldn
+      - DATABASE_URL=postgres://admin:password@postgres:5432/optimaldn
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    ports:
+      - "5001:5001"
+
+  route_planner:
+    platform: linux/arm64
+    build:
+      context: .
+      dockerfile: src/docker/route_planner.Dockerfile
+    env_file:
+      - ./src/.env
+    environment:
+      - RP_PORT=5002
+      - AWS_SHARED_CREDENTIALS_FILE=/app/.aws/credentials
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    ports:
+      - "5002:5002"
+    volumes:
+      - ~/.aws:/root/.aws:ro
+
+  notification_service:
+    platform: linux/arm64
+    build:
+      context: .
+      dockerfile: src/docker/notification_service.Dockerfile
+    environment:
+      - RABBITMQ_ADDR=amqp://guest:guest@rabbitmq:5672/
+      - NOTIFICATION_SERVICE_PORT=6000
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    ports:
+      - "6000:6000"
+    volumes:
+      - ~/.aws:/root/.aws:ro
+
+  traffic_service:
+    platform: linux/arm64
+    build:
+      context: .
+      dockerfile: src/docker/traffic_delays.Dockerfile
+    env_file:
+      - ./src/.env
+    environment:
+      - TRAFFIC_SERVICE_PORT=5004
+      - RABBITMQ_ADDR=amqp://guest:guest@rabbitmq:5672/
+      - INFLUXDB_URL=
+      - INFLUXDB_ORG=
+      - INFLUXDB_TOKEN=
+      - INFLUXDB_BUCKET=
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    ports:
+      - "5004:5004"
+    volumes:
+      - ~/.aws:/root/.aws:ro
+
+  api_gateway:
+    platform: linux/arm64
+    build:
+      context: .
+      dockerfile: src/docker/api_gateway.Dockerfile
+    environment:
+      - USER_SERVICE_ADDR=user_service:5001
+      - ROUTE_PLANNER_ADDR=route_planner:5002
+      - API_PORT=8080
+    ports:
+      - "8080:8080"
+    depends_on:
+      - user_service
+      - route_planner
+
+volumes:
+  pgdata:
+

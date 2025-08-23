@@ -1,4 +1,4 @@
-package routeplanner
+package main
 
 import (
 	"context"
@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	"github.com/joho/godotenv"
 	"github.com/matteoavallone7/optimaLDN/src/common"
 	"github.com/matteoavallone7/optimaLDN/src/rabbitmq"
+	"github.com/matteoavallone7/optimaLDN/src/routeplanner/internal"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"log"
 	"math"
@@ -24,11 +24,6 @@ import (
 )
 
 type RoutePlanner struct{}
-
-var routePublisher *rabbitmq.Publisher
-var dbClient *dynamodb.Client
-var tflAPIKey string
-var NaptanMap = make(map[string]string)
 
 const (
 	routeCreated                     = "active.route.created"
@@ -50,13 +45,13 @@ func (r *RoutePlanner) ServeRequest(ctx context.Context, args *common.UserReques
 
 	fmt.Printf("Requested route from '%s' to '%s'\n", args.StartPoint, args.EndPoint)
 	fmt.Println("Acquiring start-point NapTan code..")
-	startPoint, okStart := GetNaptan(args.StartPoint)
+	startPoint, okStart := internal.GetNaptan(args.StartPoint)
 	if !okStart {
 		return fmt.Errorf("start point '%s' not found in station mapping", args.StartPoint)
 	}
 
 	fmt.Println("Acquiring end-point NapTan code..")
-	endPoint, okEnd := GetNaptan(args.EndPoint)
+	endPoint, okEnd := internal.GetNaptan(args.EndPoint)
 	if !okEnd {
 		return fmt.Errorf("end point '%s' not found in station mapping", args.EndPoint)
 	}
@@ -77,15 +72,15 @@ func (r *RoutePlanner) ServeRequest(ctx context.Context, args *common.UserReques
 	}
 	log.Println("New active route notification published successfully.")
 
-	chosen := ConvertToChosenRoute(args.UserID, *bestJourney)
-	if err = SaveChosenRoute(ctx, chosen); err != nil {
+	chosen := internal.ConvertToChosenRoute(args.UserID, *bestJourney)
+	if err = internal.SaveChosenRoute(ctx, chosen); err != nil {
 		log.Printf("Error saving chosen route: %v", err)
 	}
 	return nil
 }
 
 func (r *RoutePlanner) GetCurrentRoute(ctx context.Context, args *common.NewRequest, reply *common.ChosenRoute) error {
-	route, err := GetActiveRoute(ctx, args.UserID)
+	route, err := internal.GetActiveRoute(ctx, args.UserID)
 	if err != nil {
 		return err
 	}
@@ -94,7 +89,7 @@ func (r *RoutePlanner) GetCurrentRoute(ctx context.Context, args *common.NewRequ
 }
 
 func findBestJourney(startNaptan, endNaptan string, departure time.Time) (*common.TFLJourney, float64, error) {
-	journeys, err := FetchRoutes(startNaptan, endNaptan, departure)
+	journeys, err := internal.FetchRoutes(startNaptan, endNaptan, departure)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to fetch routes: %w", err)
 	}
@@ -125,12 +120,12 @@ func (r *RoutePlanner) RecalculateRoute(ctx context.Context, args *common.NewReq
 		return err
 	}
 
-	currentStop, err1 := EstimateCurrentStop(*chosenRoute)
+	currentStop, err1 := internal.EstimateCurrentStop(*chosenRoute)
 	if err1 != nil {
 		return err1
 	}
 
-	currentStopNaptan, ok := GetNaptan(currentStop)
+	currentStopNaptan, ok := internal.GetNaptan(currentStop)
 	if !ok {
 		return fmt.Errorf("could not find Naptan for current stop point")
 	}
@@ -147,7 +142,7 @@ func (r *RoutePlanner) RecalculateRoute(ctx context.Context, args *common.NewReq
 	}
 	log.Println("New active route notification published successfully.")
 
-	if err = SaveChosenRoute(ctx, *chosenRoute); err != nil {
+	if err = internal.SaveChosenRoute(ctx, *chosenRoute); err != nil {
 		log.Printf("Error saving chosen route: %v", err)
 	}
 
@@ -160,13 +155,13 @@ func (r *RoutePlanner) RecalculateRoute(ctx context.Context, args *common.NewReq
 }
 
 func sharedRecalculationLogic(ctx context.Context, userID string) (*common.ChosenRoute, error) {
-	chosenRoute, err := GetActiveRoute(ctx, userID)
+	chosenRoute, err := internal.GetActiveRoute(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get active route for user %s: %w", userID, err)
 	}
-	activeRoute := ConvertToActiveRoute(userID, chosenRoute)
+	activeRoute := internal.ConvertToActiveRoute(userID, chosenRoute)
 	data, _ := json.Marshal(activeRoute)
-	if err = routePublisher.Publish(routeTerminated, data, amqp.Table{"Event-Type": "Route Aborted"}); err != nil {
+	if err = internal.RoutePublisher.Publish(routeTerminated, data, amqp.Table{"Event-Type": "Route Aborted"}); err != nil {
 		return nil, fmt.Errorf("no active route found for user %s", userID)
 	}
 	log.Println("Aborted route notification published successfully.")
@@ -177,17 +172,17 @@ func sharedRecalculationLogic(ctx context.Context, userID string) (*common.Chose
 func (r *RoutePlanner) TerminateRoute(ctx context.Context, args *common.NewRequest, reply *common.SavedResp) error {
 
 	fmt.Printf("Request received from '%s' to '%s'\n", args.UserID, args.Reason)
-	activeRoute, err := GetActiveRoute(ctx, args.UserID)
+	activeRoute, err := internal.GetActiveRoute(ctx, args.UserID)
 	if err != nil {
 		return fmt.Errorf("failed to get active route for user %s: %w", args.UserID, err)
 	}
 	data, _ := json.Marshal(activeRoute)
-	if err := routePublisher.Publish(routeTerminated, data, amqp.Table{"Event-Type": "Route Terminated"}); err != nil {
+	if err := internal.RoutePublisher.Publish(routeTerminated, data, amqp.Table{"Event-Type": "Route Terminated"}); err != nil {
 		return fmt.Errorf("failed to publish terminated route: %w", err)
 	}
 	log.Println("Terminated route notification published successfully.")
 
-	err = DeleteChosenRoute(ctx, args.UserID)
+	err = internal.DeleteChosenRoute(ctx, args.UserID)
 	if err != nil {
 		return fmt.Errorf("failed to delete chosen route: %w", err)
 	}
@@ -208,7 +203,7 @@ func (r *RoutePlanner) AcceptSavedRouteRequest(args *common.UserSavedRoute, repl
 	}
 
 	data, _ := json.Marshal(activeRoute)
-	if err := routePublisher.Publish(routeCreated, data, amqp.Table{"Event-Type": "Route Created"}); err != nil {
+	if err := internal.RoutePublisher.Publish(routeCreated, data, amqp.Table{"Event-Type": "Route Created"}); err != nil {
 		return fmt.Errorf("failed to publish saved active route: %w", err)
 	}
 
@@ -234,7 +229,7 @@ func notifyNewRoute(user string, journey *common.TFLJourney) error {
 	newRoute.LineIDs = lines
 	data, _ := json.Marshal(newRoute)
 
-	if err := routePublisher.Publish(routeCreated, data, amqp.Table{"Event-Type": "Route Created"}); err != nil {
+	if err := internal.RoutePublisher.Publish(routeCreated, data, amqp.Table{"Event-Type": "Route Created"}); err != nil {
 		return fmt.Errorf("failed to publish new active route: %w", err)
 	}
 
@@ -257,13 +252,13 @@ func handleCrowding(journey common.TFLJourney, day string) float64 {
 
 	dayOfWeek := findDayOfWeek(day)
 	for _, leg := range journey.Legs {
-		timeBand, err := TimeStringToTfLTimeBand(leg.ArrivalTime)
+		timeBand, err := internal.TimeStringToTfLTimeBand(leg.ArrivalTime)
 		if err != nil {
 			log.Printf("Invalid arrival time %s: %v", leg.ArrivalTime, err)
 			continue
 		}
 		for _, stop := range leg.Path.StopPoints {
-			crowd, erro := FetchCrowding(stop.ID, dayOfWeek)
+			crowd, erro := internal.FetchCrowding(stop.ID, dayOfWeek)
 			if erro != nil {
 				log.Printf("Could not fetch crowding for stop %s: %v", stop.ID, err)
 				continue
@@ -278,7 +273,7 @@ func handleCrowding(journey common.TFLJourney, day string) float64 {
 		}
 	}
 
-	score := GetScore(totalCrowding, stopCount, journey.Duration)
+	score := internal.GetScore(totalCrowding, stopCount, journey.Duration)
 	return score
 }
 
@@ -313,10 +308,10 @@ func loadNapTanFile(filename string) (map[string]string, error) {
 		}
 		commonName := record[1]
 		naptanCode := record[4]
-		NaptanMap[commonName] = naptanCode
+		internal.NaptanMap[commonName] = naptanCode
 	}
 
-	return NaptanMap, nil
+	return internal.NaptanMap, nil
 }
 
 func main() {
@@ -327,13 +322,13 @@ func main() {
 
 	cfg, err := config.LoadDefaultConfig(ctx)
 	failOnError(err, "Failed to load AWS config")
-	dbClient = dynamodb.NewFromConfig(cfg)
+	internal.DBClient = dynamodb.NewFromConfig(cfg)
 	log.Println("DynamoDB client initialized.")
 
-	err = godotenv.Load()
-	failOnError(err, "Error loading .env file")
+	// err = godotenv.Load()
+	// failOnError(err, "Error loading .env file")
 
-	tflAPIKey = os.Getenv("TFL_API_KEY")
+	internal.TflAPIKey = os.Getenv("TFL_API_KEY")
 
 	routePlanner := new(RoutePlanner)
 	server := rpc.NewServer()
@@ -370,7 +365,7 @@ func main() {
 	_, err = rabbitmq.DeclareAndBindQueue(ch, notificationQueueName, bindingKey, notificationOutboundExchangeName)
 	failOnError(err, fmt.Sprintf("Failed to declare and bind queue '%s' for Notification Service", notificationQueueName))
 
-	routePublisher = rabbitmq.NewPublisher(ch, routeOutboundNotifications)
+	internal.RoutePublisher = rabbitmq.NewPublisher(ch, routeOutboundNotifications)
 
 	notifHandler := func(delivery amqp.Delivery) bool {
 		log.Printf("[Route Planner Service] Received Delay Event: %s (Key: %s)", string(delivery.Body), delivery.RoutingKey)
@@ -385,12 +380,12 @@ func main() {
 			log.Printf("[Route Planner Service] Failed to calculate New Request: %v", err3)
 			return false
 		}
-		currentStop, er := EstimateCurrentStop(*route)
+		currentStop, er := internal.EstimateCurrentStop(*route)
 		if er != nil {
 			log.Printf("[Route Planner Service] Failed to estimate Current Stop: %v", er)
 			return false
 		}
-		currentStopNaptan, ok := GetNaptan(currentStop)
+		currentStopNaptan, ok := internal.GetNaptan(currentStop)
 		if !ok {
 			log.Printf("[Route Planner Service] Failed to get Naptan: %v", currentStop)
 			return false
@@ -413,12 +408,12 @@ func main() {
 		}
 		log.Println("New active route notification published successfully.")
 
-		if err = SaveChosenRoute(ctx, *route); err != nil {
+		if err = internal.SaveChosenRoute(ctx, *route); err != nil {
 			log.Printf("Error saving chosen route: %v", err)
 			return false
 		}
 
-		NotifyUser(payload.UserID, "🛑 Critical delay! Route recalculated:\n"+buildSummary(bestJourney))
+		internal.NotifyUser(payload.UserID, "🛑 Critical delay! Route recalculated:\n"+buildSummary(bestJourney))
 
 		return true
 	}

@@ -1,4 +1,4 @@
-package routeplanner
+package internal
 
 import (
 	"encoding/json"
@@ -20,7 +20,7 @@ func FetchRoutes(from, to string, departure time.Time) (*common.TFLJourneyRespon
 		to,
 		formattedDate,
 		formattedTime,
-		tflAPIKey,
+		TflAPIKey,
 	)
 
 	client := http.Client{Timeout: 10 * time.Second}

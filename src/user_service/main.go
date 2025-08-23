@@ -1,4 +1,4 @@
-package user_service
+package main
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/matteoavallone7/optimaLDN/src/common"
 	"github.com/matteoavallone7/optimaLDN/src/rabbitmq"
+	"github.com/matteoavallone7/optimaLDN/src/user_service/logic"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"golang.org/x/crypto/bcrypt"
 	"log"
@@ -123,7 +124,7 @@ func (u *UserService) SaveFavoriteRoute(ctx context.Context, args *common.NewReq
 		return fmt.Errorf("rpc error getting active route: %w", err)
 	}
 
-	saved := ConvertToUserSavedRoute(args.UserID, route)
+	saved := logic.ConvertToUserSavedRoute(args.UserID, route)
 
 	err = saveRouteToPostgres(ctx, db, saved)
 	if err != nil {
@@ -188,7 +189,8 @@ func main() {
 	log.Printf("Listening on 0.0.0.0:%s", port)
 
 	fmt.Println("Attempting to connect to PostgreSQL...")
-	dsn := os.Getenv("DATABASE_URL") // example: postgres://admin:password@localhost:5432/optimaldn
+	dsn := os.Getenv("DATABASE_URL")
+	log.Println(dsn)
 	db, err = pgxpool.New(ctx, dsn)
 	failOnError(err, "Failed to connect to PostgreSQL")
 	log.Println("Connected to PostgreSQL.")
@@ -219,7 +221,7 @@ func main() {
 			return false
 		}
 
-		NotifyUser(payload.UserID, "⚠️ Sudden delay on your route. Recalculate? (y/n)")
+		logic.NotifyUser(payload.UserID, "⚠️ Sudden delay on your route. Recalculate? (y/n)")
 
 		return true
 	}

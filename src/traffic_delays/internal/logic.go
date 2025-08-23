@@ -1,4 +1,4 @@
-package traffic_delays
+package internal
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 
 func ExecuteAndProcessQuery(ctx context.Context, fluxQuery string, alertType string) ([]common.TfLAlert, error) {
 	var alerts []common.TfLAlert
-	result, err := influxQueryAPI.Query(ctx, fluxQuery)
+	result, err := InfluxQueryAPI.Query(ctx, fluxQuery)
 	if err != nil {
 		return nil, fmt.Errorf("error executing Flux query (%s): %w", alertType, err)
 	}

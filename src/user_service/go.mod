@@ -7,9 +7,7 @@ require (
 	github.com/rabbitmq/amqp091-go v1.10.0
 )
 
-replace github.com/matteoavallone7/optimaLDN/src/common => ../common
 
-replace github.com/matteoavallone7/optimaLDN/src/rabbitmq => ../rabbitmq
 
 require (
 	github.com/jackc/pgpassfile v1.0.0 // indirect

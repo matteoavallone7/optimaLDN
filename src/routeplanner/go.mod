@@ -14,9 +14,6 @@ require (
 
 )
 
-replace github.com/matteoavallone7/optimaLDN/src/common => ../common
-
-replace github.com/matteoavallone7/optimaLDN/src/rabbitmq => ../rabbitmq
 
 require (
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.71 // indirect

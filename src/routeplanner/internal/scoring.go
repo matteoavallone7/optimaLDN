@@ -1,4 +1,4 @@
-package routeplanner
+package internal
 
 import (
 	"fmt"

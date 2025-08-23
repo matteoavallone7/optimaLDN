@@ -1,0 +1,22 @@
+# Ignore git data
+.git/
+.gitignore
+
+# Ignore local tooling/configs
+.vscode/
+.idea/
+*.swp
+*.log
+
+# Ignore binaries
+**/bin/
+**/build/
+**/*.exe
+**/*.out
+
+# Ignore test data
+**/testdata/
+
+# Ignore OS-specific junk
+.DS_Store
+Thumbs.db
