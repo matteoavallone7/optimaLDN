@@ -12,7 +12,7 @@ import (
 func FetchRoutes(from, to string, departure time.Time) (*common.TFLJourneyResponse, error) {
 
 	formattedDate := departure.Format("20060102")
-	formattedTime := departure.Format("15:04")
+	formattedTime := departure.Format("1504")
 
 	url := fmt.Sprintf(
 		"https://api.tfl.gov.uk/Journey/JourneyResults/%s/to/%s?date=%s&time=%s&timeIs=Departing&app_key=%s",
@@ -23,8 +23,18 @@ func FetchRoutes(from, to string, departure time.Time) (*common.TFLJourneyRespon
 		TflAPIKey,
 	)
 
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error creating request: %w", err)
+	}
+
+	// Add the User-Agent header
+	req.Header.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36")
+
 	client := http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Get(url)
+
+	fmt.Println("TfL Request URL:", url)
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("error calling TfL API: %w", err)
 	}
@@ -45,10 +55,19 @@ func FetchRoutes(from, to string, departure time.Time) (*common.TFLJourneyRespon
 func FetchCrowding(naptan, weekday string) (*common.CrowdingResp, error) {
 	url := fmt.Sprintf("https://api.tfl.gov.uk/crowding/%s/%s", naptan, weekday)
 
-	client := http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Get(url)
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error creating request: %w", err)
+	}
+
+	// Add the User-Agent header
+	req.Header.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36")
+
+	client := http.Client{Timeout: 10 * time.Second}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error calling TfL API: %w", err)
 	}
 	defer resp.Body.Close()
 

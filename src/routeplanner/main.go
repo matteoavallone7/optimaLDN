@@ -41,7 +41,7 @@ func failOnError(err error, msg string) {
 	}
 }
 
-func (r *RoutePlanner) ServeRequest(ctx context.Context, args *common.UserRequest, reply *common.RouteResult) error {
+func (r *RoutePlanner) ServeRequest(args *common.UserRequest, reply *common.RouteResult) error {
 
 	fmt.Printf("Requested route from '%s' to '%s'\n", args.StartPoint, args.EndPoint)
 	fmt.Println("Acquiring start-point NapTan code..")
@@ -49,18 +49,22 @@ func (r *RoutePlanner) ServeRequest(ctx context.Context, args *common.UserReques
 	if !okStart {
 		return fmt.Errorf("start point '%s' not found in station mapping", args.StartPoint)
 	}
+	fmt.Println(startPoint)
 
 	fmt.Println("Acquiring end-point NapTan code..")
 	endPoint, okEnd := internal.GetNaptan(args.EndPoint)
 	if !okEnd {
 		return fmt.Errorf("end point '%s' not found in station mapping", args.EndPoint)
 	}
+	fmt.Println(endPoint)
 
 	fmt.Println("Fetching available routes..")
 	bestJourney, bestScore, err := findBestJourney(startPoint, endPoint, args.Departure)
 	if err != nil {
 		return fmt.Errorf("could not find best journey: %s", err)
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
 	reply.From = args.StartPoint
 	reply.To = args.EndPoint
@@ -79,7 +83,9 @@ func (r *RoutePlanner) ServeRequest(ctx context.Context, args *common.UserReques
 	return nil
 }
 
-func (r *RoutePlanner) GetCurrentRoute(ctx context.Context, args *common.NewRequest, reply *common.ChosenRoute) error {
+func (r *RoutePlanner) GetCurrentRoute(args *common.NewRequest, reply *common.ChosenRoute) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 	route, err := internal.GetActiveRoute(ctx, args.UserID)
 	if err != nil {
 		return err
@@ -112,7 +118,9 @@ func findBestJourney(startNaptan, endNaptan string, departure time.Time) (*commo
 	return bestJourney, bestScore, nil
 }
 
-func (r *RoutePlanner) RecalculateRoute(ctx context.Context, args *common.NewRequest, reply *common.RouteResult) error {
+func (r *RoutePlanner) RecalculateRoute(args *common.NewRequest, reply *common.RouteResult) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
 	fmt.Printf("Request received from '%s' to '%s'\n", args.UserID, args.Reason)
 	chosenRoute, err := sharedRecalculationLogic(ctx, args.UserID)
@@ -169,7 +177,9 @@ func sharedRecalculationLogic(ctx context.Context, userID string) (*common.Chose
 	return chosenRoute, nil
 }
 
-func (r *RoutePlanner) TerminateRoute(ctx context.Context, args *common.NewRequest, reply *common.SavedResp) error {
+func (r *RoutePlanner) TerminateRoute(args *common.NewRequest, reply *common.SavedResp) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
 	fmt.Printf("Request received from '%s' to '%s'\n", args.UserID, args.Reason)
 	activeRoute, err := internal.GetActiveRoute(ctx, args.UserID)
@@ -194,11 +204,18 @@ func (r *RoutePlanner) TerminateRoute(ctx context.Context, args *common.NewReque
 }
 
 func (r *RoutePlanner) AcceptSavedRouteRequest(args *common.UserSavedRoute, reply *common.SavedResp) error {
-
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 	fmt.Printf("Requested saved route from '%s' to '%s'\n", args.StartPoint, args.EndPoint)
 	fmt.Println("Registering route...")
+
+	savedRoute := internal.ConvertUserSavedToChosenRoute(args)
+	if err := internal.SaveChosenRoute(ctx, savedRoute); err != nil {
+		log.Printf("Error saving chosen route: %v", err)
+	}
+
 	var activeRoute = common.ActiveRoute{
-		UserID:  args.RouteID,
+		UserID:  args.UserID,
 		LineIDs: args.LineNames,
 	}
 
@@ -324,9 +341,6 @@ func main() {
 	failOnError(err, "Failed to load AWS config")
 	internal.DBClient = dynamodb.NewFromConfig(cfg)
 	log.Println("DynamoDB client initialized.")
-
-	// err = godotenv.Load()
-	// failOnError(err, "Error loading .env file")
 
 	internal.TflAPIKey = os.Getenv("TFL_API_KEY")
 

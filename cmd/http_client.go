@@ -23,7 +23,7 @@ func Login(username, password string) (bool, error) {
 	url := fmt.Sprintf("http://%slogin", baseURL)
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(payload))
 	if err != nil {
-		return false, fmt.Errorf("Error sending login request to %s", url)
+		return false, fmt.Errorf("error sending login request to %s", url)
 	}
 	defer resp.Body.Close()
 
@@ -33,26 +33,26 @@ func Login(username, password string) (bool, error) {
 	return result.Status == common.StatusDone, nil
 }
 
-func ViewFavoriteRoutes(userID string) error {
+func ViewFavoriteRoutes(userID string) ([]string, error) {
 	url := fmt.Sprintf("http://%suser/saved-routes?userID=%s", baseURL, userID)
 	resp, err := http.Get(url)
 	if err != nil {
-		return fmt.Errorf("failed to fetch saved routes: %s", err)
+		return nil, fmt.Errorf("failed to fetch saved routes: %s", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("error from server: %s\n", body)
+		return nil, fmt.Errorf("error from server: %s\n", body)
 	}
 
 	var routes []common.UserSavedRoute
 	if err = json.NewDecoder(resp.Body).Decode(&routes); err != nil {
-		return fmt.Errorf("failed to decode saved routes: %s", err)
+		return nil, fmt.Errorf("failed to decode saved routes: %s", err)
 	}
 
 	if len(routes) == 0 {
-		return fmt.Errorf("no saved routes found")
+		return nil, fmt.Errorf("no saved routes found")
 	}
 
 	fmt.Println("Saved Routes:")
@@ -61,33 +61,43 @@ func ViewFavoriteRoutes(userID string) error {
 			i+1, route.StartPoint, route.EndPoint, route.TransportMode, route.Stops, route.EstimatedTime)
 	}
 
-	return nil
+	uuids := make([]string, len(routes))
+	for i, route := range routes {
+		uuids[i] = route.RouteID
+	}
+
+	return uuids, nil
 }
 
-func AcceptSavedRoute(userID string) error {
-	var routeID string
-	fmt.Print("Enter Route ID to accept: ")
-	fmt.Scanln(&routeID)
+func AcceptSavedRoute(userID string, routeUUID string) error {
 
-	// First fetch the route using API Gateway
-	url := fmt.Sprintf("http://localhost:8080/user/saved-route?userID=%s&routeID=%s", userID, routeID)
+	url := fmt.Sprintf("http://localhost:8080/user/saved-route?userID=%s&routeID=%s", userID, routeUUID)
 	resp, err := http.Get(url)
-	if err != nil || resp.StatusCode != http.StatusOK {
+	if err != nil {
 		return fmt.Errorf("failed to fetch route: %w", err)
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to fetch route: status %d, body: %s", resp.StatusCode, string(body))
+	}
 
 	var route common.UserSavedRoute
 	if err := json.NewDecoder(resp.Body).Decode(&route); err != nil {
 		return fmt.Errorf("failed to decode saved route: %w", err)
 	}
 
-	// Then send it to the accept endpoint
 	acceptURL := "http://localhost:8080/user/accept-saved-route"
 	jsonData, _ := json.Marshal(route)
 	res, err := http.Post(acceptURL, "application/json", bytes.NewBuffer(jsonData))
-	if err != nil || res.StatusCode != http.StatusOK {
+	if err != nil {
 		return fmt.Errorf("failed to accept saved route: %w", err)
+	}
+
+	if res.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(res.Body)
+		return fmt.Errorf("failed to accept saved route: status %d, body: %s", res.StatusCode, string(body))
 	}
 
 	fmt.Println("Route accepted and activated successfully.")

@@ -25,8 +25,8 @@ const (
 	trafficQueueName                 = "traffic_queue"
 	trafficBindingKey                = "traffic.route.update.#"
 	trafficExchange                  = "traffic_events_exchange"
-	routeQueueName                   = "route_panner_queue"
-	routeBindingKey                  = "route.update.#"
+	routeQueueName                   = "route_planner_queue"
+	routeBindingKey                  = "active.route.#"
 	routeExchange                    = "route_planner_exchange"
 	defaultCacheExpiration           = 5 * time.Minute // How long an item stays in cache
 	cacheCleanupInterval             = 10 * time.Minute

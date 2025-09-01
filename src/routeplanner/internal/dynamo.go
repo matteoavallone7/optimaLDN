@@ -15,7 +15,7 @@ func GetActiveRoute(ctx context.Context, userID string) (*common.ChosenRoute, er
 	input := &dynamodb.GetItemInput{
 		TableName: aws.String("ChosenRoutes"),
 		Key: map[string]types.AttributeValue{
-			"UserID": &types.AttributeValueMemberS{Value: userID},
+			"userID": &types.AttributeValueMemberS{Value: userID},
 		},
 	}
 
@@ -59,7 +59,7 @@ func SaveChosenRoute(ctx context.Context, route common.ChosenRoute) error {
 
 func DeleteChosenRoute(ctx context.Context, userID string) error {
 	key, err := attributevalue.MarshalMap(map[string]string{
-		"UserID": userID,
+		"userID": userID,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to marshal key: %w", err)

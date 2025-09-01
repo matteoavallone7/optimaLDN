@@ -15,9 +15,13 @@ import (
 	"net/rpc"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
+	"time"
 )
+
+var routePlannerClient *rpc.Client
 
 type UserService struct{}
 
@@ -37,18 +41,20 @@ func failOnError(err error, msg string) {
 	}
 }
 
-func (u *UserService) AuthenticateUser(ctx context.Context, args *common.Auth, reply *common.SavedResp) error {
+func (u *UserService) AuthenticateUser(args *common.Auth, reply *common.SavedResp) error {
 	var passwordHash string
 	query := `SELECT password_hash FROM users WHERE username = $1`
 
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 	err := db.QueryRow(ctx, query, args.UserID).Scan(&passwordHash)
 	if err != nil {
 		log.Printf("User '%s' not found or query error: %v", args.UserID, err)
 		reply.Status = common.StatusError
-		return nil // return nil here so the RPC call doesn't crash on failed login
+		return nil
 	}
 
-	err = bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(args.Password))
+	err = bcrypt.CompareHashAndPassword([]byte(strings.TrimSpace(passwordHash)), []byte(args.Password))
 	if err != nil {
 		log.Printf("Invalid password for user '%s'", args.UserID)
 		reply.Status = common.StatusError
@@ -66,6 +72,7 @@ func saveRouteToPostgres(ctx context.Context, db *pgxpool.Pool, route common.Use
         (route_id, user_id, start_point, end_point, transport_mode, 
          stops, estimated_time, line_names, stops_names)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        ON CONFLICT (user_id, start_point, end_point, transport_mode) DO NOTHING
     `, route.RouteID, route.UserID, route.StartPoint, route.EndPoint,
 		route.TransportMode, route.Stops, route.EstimatedTime,
 		route.LineNames, route.StopsNames)
@@ -76,7 +83,10 @@ func saveRouteToPostgres(ctx context.Context, db *pgxpool.Pool, route common.Use
 	return nil
 }
 
-func (u *UserService) GetUserSavedRoutes(ctx context.Context, args *common.NewRequest, reply *[]common.UserSavedRoute) error {
+func (u *UserService) GetUserSavedRoutes(args *common.NewRequest, reply *[]common.UserSavedRoute) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	rows, err := db.Query(ctx, `
         SELECT route_id, user_id, start_point, end_point, transport_mode, 
                stops, estimated_time, line_names, stops_names
@@ -111,15 +121,13 @@ func (u *UserService) GetUserSavedRoutes(ctx context.Context, args *common.NewRe
 	return nil
 }
 
-func (u *UserService) SaveFavoriteRoute(ctx context.Context, args *common.NewRequest) error {
-	client, err := rpc.Dial("tcp", os.Getenv("ROUTE_PLANNER_ADDR")) // e.g. "localhost:1234"
-	if err != nil {
-		return fmt.Errorf("failed to connect to route planner: %w", err)
-	}
-	defer client.Close()
+func (u *UserService) SaveFavoriteRoute(args *common.NewRequest, reply *common.SavedResp) error {
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
 	var route common.ChosenRoute
-	err = client.Call("RoutePlanner.GetCurrentRoute", args.UserID, &route)
+	err := routePlannerClient.Call("RoutePlanner.GetCurrentRoute", args, &route)
 	if err != nil {
 		return fmt.Errorf("rpc error getting active route: %w", err)
 	}
@@ -131,28 +139,26 @@ func (u *UserService) SaveFavoriteRoute(ctx context.Context, args *common.NewReq
 		return fmt.Errorf("failed to save favorite route: %w", err)
 	}
 
+	reply.Status = common.StatusDone
 	return nil
 }
 
-func (u *UserService) CallAcceptSavedRoute(savedRoute common.UserSavedRoute) error {
-	client, err := rpc.Dial("tcp", os.Getenv("ROUTE_PLANNER_ADDR"))
+func (u *UserService) CallAcceptSavedRoute(savedRoute common.UserSavedRoute, reply *common.SavedResp) error {
+
+	err := routePlannerClient.Call("RoutePlanner.AcceptSavedRouteRequest", &savedRoute, &reply)
 	if err != nil {
-		return fmt.Errorf("RPC dial failed: %w", err)
-	}
-	defer client.Close()
-
-	var success bool
-	err = client.Call("RoutePlanner.AcceptSavedRoute", &savedRoute, &success)
-	if err != nil || !success {
-		return fmt.Errorf("AcceptSavedRoute failed: %w", err)
+		return fmt.Errorf("AcceptSavedRoute RPC call failed: %w", err)
 	}
 
+	reply.Status = common.StatusDone
 	return nil
 }
 
-func (u *UserService) GetSavedRouteByID(ctx context.Context, req *common.RouteLookup, reply *common.UserSavedRoute) error {
+func (u *UserService) GetSavedRouteByID(req *common.RouteLookup, reply *common.UserSavedRoute) error {
 	query := `SELECT * FROM user_saved_routes WHERE user_id=$1 AND route_id=$2`
 
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 	row := db.QueryRow(ctx, query, req.UserID, req.RouteID)
 
 	var saved common.UserSavedRoute
@@ -194,6 +200,13 @@ func main() {
 	db, err = pgxpool.New(ctx, dsn)
 	failOnError(err, "Failed to connect to PostgreSQL")
 	log.Println("Connected to PostgreSQL.")
+
+	routePlannerAddr := os.Getenv("ROUTE_PLANNER_ADDR")
+	routePlannerClient, err = rpc.Dial("tcp", routePlannerAddr)
+	if err != nil {
+		log.Fatalf("Failed to connect to Route Planner RPC at %s: %v", routePlannerAddr, err)
+	}
+	log.Printf("Successfully connected to Route Planner RPC at %s", routePlannerAddr)
 
 	conn, ch, err := rabbitmq.InitRabbitMQ(userOutboundNotifications, userType)
 	failOnError(err, "Failed to connect to RabbitMQ")
@@ -238,7 +251,7 @@ func main() {
 			server.Accept(listener)
 			if err != nil {
 				log.Printf("RPC Accept error: %v", err)
-				break // or continue, depending on if you want to retry
+				break
 			}
 		}
 	}()

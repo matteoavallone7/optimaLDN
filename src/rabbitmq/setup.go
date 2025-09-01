@@ -83,7 +83,7 @@ func DeclareAndBindQueue(ch *amqp.Channel, queueName, bindingKey, exchangeName s
 	if err != nil {
 		return amqp.Queue{}, fmt.Errorf("failed to declare queue '%s': %w", queueName, err)
 	}
-	log.Printf("Queue '%s' declared successfully. Messages: %d, Consumers: %d", q.Name, q.Consumers)
+	log.Printf("Queue '%s' declared successfully.", q.Name)
 
 	// Bind the queue to the exchange
 	// noWait: false -> wait for server confirmation

@@ -15,7 +15,7 @@ var userServiceClient *rpc.Client
 var routePlannerClient *rpc.Client
 
 var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool { return true }, // allow all origins (or tighten in prod)
+	CheckOrigin: func(r *http.Request) bool { return true },
 }
 
 var clients = make(map[string]*websocket.Conn) // userID → connection
@@ -69,22 +69,14 @@ func sendNotificationHandler(w http.ResponseWriter, r *http.Request) {
 func initClients() {
 	var err error
 
-	// Connect to User Service
 	userServiceAddr := os.Getenv("USER_SERVICE_ADDR")
-	if userServiceAddr == "" {
-		userServiceAddr = "localhost:5001" // Fallback to a default address
-	}
 	userServiceClient, err = rpc.Dial("tcp", userServiceAddr)
 	if err != nil {
 		log.Fatalf("Failed to connect to User Service RPC at %s: %v", userServiceAddr, err)
 	}
 	log.Printf("Successfully connected to User Service RPC at %s", userServiceAddr)
 
-	// Connect to Route Planner Service
 	routePlannerAddr := os.Getenv("ROUTE_PLANNER_ADDR")
-	if routePlannerAddr == "" {
-		routePlannerAddr = "localhost:50051" // Fallback to a default address
-	}
 	routePlannerClient, err = rpc.Dial("tcp", routePlannerAddr)
 	if err != nil {
 		log.Fatalf("Failed to connect to Route Planner RPC at %s: %v", routePlannerAddr, err)
@@ -141,9 +133,9 @@ func handleAcceptSavedRoute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var rpcErr error
-	err := userServiceClient.Call("UserService.CallAcceptSavedRoute", &savedRoute, &rpcErr)
-	if err != nil || rpcErr != nil {
+	var reply common.SavedResp
+	err := userServiceClient.Call("UserService.CallAcceptSavedRoute", &savedRoute, &reply)
+	if err != nil {
 		http.Error(w, fmt.Sprintf("RPC call failed: %v", err), http.StatusInternalServerError)
 		return
 	}
@@ -201,7 +193,7 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := userServiceClient.Call("UserService.AuthenticateUser", authReq, &reply)
+	err := userServiceClient.Call("UserService.AuthenticateUser", &authReq, &reply)
 	if err != nil {
 		http.Error(w, "Authentication failed", http.StatusInternalServerError)
 		return
@@ -230,11 +222,11 @@ func handleSaveFavoriteRoute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var rpcErr error
-	err = userServiceClient.Call("UserService.SaveFavoriteRoute", &req, &rpcErr)
-	if err != nil || rpcErr != nil {
+	var reply common.SavedResp
+	err = userServiceClient.Call("UserService.SaveFavoriteRoute", &req, &reply)
+	if err != nil {
 		http.Error(w, "Failed to save route", http.StatusInternalServerError)
-		log.Printf("RPC error: %v | inner: %v", err, rpcErr)
+		log.Printf("RPC error: %v", err)
 		return
 	}
 

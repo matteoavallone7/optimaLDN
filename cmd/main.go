@@ -32,13 +32,19 @@ func listenToNotifications(userID string, done <-chan struct{}) {
 	defer conn.Close()
 
 	msgChan := make(chan []byte)
+	stopReader := make(chan struct{})
 
 	go func() {
 		for {
 			_, msg, err2 := conn.ReadMessage()
 			if err2 != nil {
-				log.Printf("WebSocket read error for user %s: %v", userID, err2)
-				return
+				select {
+				case <-stopReader:
+					return
+				default:
+					log.Printf("WebSocket read error for user %s: %v", userID, err)
+					return
+				}
 			}
 			msgChan <- msg
 		}
@@ -60,7 +66,8 @@ func listenToNotifications(userID string, done <-chan struct{}) {
 				}
 			}
 		case <-done:
-			log.Println("Stopping notification listener.")
+			// log.Printf("Stopping notification listener.")
+			close(stopReader) // tell reader goroutine to exit
 			return
 		}
 	}
@@ -89,18 +96,25 @@ func sharedLogic(userID string) error {
 		if err != nil {
 			return fmt.Errorf("could not save to favorites: %v", err)
 		}
+		fmt.Println("✅ Route saved to favorites. Now manage your journey.")
 	}
-	if readInput("🛑 Terminate journey? (y/n):") == "y" {
-		err := TerminateRouteFromMenu(userID)
-		if err != nil {
-			return fmt.Errorf("could not terminate route: %w", err)
+	for {
+		choice := readInput("🛑 Terminate journey? (y/n): ")
+		if choice == "y" {
+			if err := TerminateRouteFromMenu(userID); err != nil {
+				return fmt.Errorf("could not terminate route: %w", err)
+			}
+			break
 		}
+
+		fmt.Println("Journey still active. Please terminate before exiting.")
 	}
 
 	return nil
 }
 
-func savedUserMenu(userID string) error {
+func savedUserMenu(userID string, uuids []string) error {
+	var selectedUUID string
 	for {
 		fmt.Println("\n\nWhere are we going next?")
 		fmt.Println("1. 🛫 Embark on one of your saved routes")
@@ -108,12 +122,21 @@ func savedUserMenu(userID string) error {
 		choice := readInput("> ")
 		switch choice {
 		case "1":
-			if err := AcceptSavedRoute(userID); err != nil {
-				fmt.Println("❌ Error:", err)
+			var chosen int
+			fmt.Print("\nEnter the number of the route to embark: ")
+			_, err := fmt.Scanf("%d", &chosen)
+			if err != nil || chosen < 1 || chosen > len(uuids) {
+				fmt.Println("❌ Invalid choice")
 				continue
 			}
-			if err := sharedLogic(userID); err != nil {
-				fmt.Println("❌ Error:", err)
+			selectedUUID = uuids[chosen-1]
+
+			if err2 := AcceptSavedRoute(userID, selectedUUID); err2 != nil {
+				fmt.Println("❌ Error:", err2)
+				continue
+			}
+			if err3 := sharedLogic(userID); err3 != nil {
+				fmt.Println("❌ Error:", err3)
 				continue
 			}
 		case "2":
@@ -126,20 +149,20 @@ func savedUserMenu(userID string) error {
 
 func loggedUserMenu(userID string) error {
 	for {
-		fmt.Printf("Good to see you again, '%s'!\n", userID)
-		fmt.Println("What do you want to do today?")
+		fmt.Printf("\n\nGood to see you again, '%s'!\n", userID)
+		fmt.Println("\nWhat do you want to do today?")
 		fmt.Println("1. 🗂 Check favorite routes")
 		fmt.Println("2. 🛫 Start new route")
 		fmt.Println("3. Go back")
 		choice := readInput("Select an option: ")
 		switch choice {
 		case "1":
-			err := ViewFavoriteRoutes(userID)
+			uuids, err := ViewFavoriteRoutes(userID)
 			if err != nil {
 				fmt.Println("❌ Error:", err)
 				continue
 			}
-			err = savedUserMenu(userID)
+			err = savedUserMenu(userID, uuids)
 			if err != nil {
 				fmt.Println("❌ Error:", err)
 				continue
@@ -187,8 +210,6 @@ func mainMenu(reader *bufio.Reader) {
 				fmt.Println("Login failed. Try again.")
 			} else {
 
-				// Start listening for notifications in a separate goroutine
-				// and pass a channel to signal when the user logs out.
 				done := make(chan struct{})
 				go listenToNotifications(user, done)
 
@@ -196,7 +217,6 @@ func mainMenu(reader *bufio.Reader) {
 				if err != nil {
 					fmt.Println("❌ Error:", err)
 				}
-				// When loggedUserMenu returns, signal the goroutine to stop.
 				close(done)
 
 			}
@@ -211,7 +231,7 @@ func mainMenu(reader *bufio.Reader) {
 
 func main() {
 	reader := bufio.NewReader(os.Stdin)
-	baseURL = os.Getenv("API_GATEWAY_URL")
+	baseURL = "localhost:8080/"
 	setupInterruptHandler()
 
 	mainMenu(reader)

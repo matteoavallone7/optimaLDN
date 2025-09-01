@@ -3,6 +3,7 @@ package internal
 import (
 	"fmt"
 	"github.com/matteoavallone7/optimaLDN/src/common"
+	"strings"
 	"time"
 )
 
@@ -44,7 +45,6 @@ func GetScore(totalCrowding float64, totalStops, duration int) float64 {
 func EstimateCurrentStop(route common.ChosenRoute) (string, error) {
 	now := time.Now()
 
-	// 1. Check if journey is already completed
 	if len(route.Legs) == 0 {
 		return "", fmt.Errorf("no legs in the route")
 	}
@@ -54,19 +54,15 @@ func EstimateCurrentStop(route common.ChosenRoute) (string, error) {
 		return "", fmt.Errorf("journey already completed")
 	}
 
-	// 2. Iterate over legs and find current one based on time
 	for _, leg := range route.Legs {
 		depTime, err1 := time.Parse(time.RFC3339, leg.StartTime)
 		arrTime, err2 := time.Parse(time.RFC3339, leg.EndTime)
 
 		if err1 != nil || err2 != nil {
-			continue // Skip legs with invalid timestamps
+			continue
 		}
 
-		// Check if 'now' is within the current leg's time frame (inclusive of start, exclusive of end)
-		// Using !now.Before(depTime) is equivalent to now.After(depTime) || now.Equal(depTime)
 		if !now.Before(depTime) && now.Before(arrTime) {
-			// 3. Estimate current stop based on progress through this leg
 			if len(leg.StopIDs) == 0 {
 				return "", fmt.Errorf("no stops available in current leg")
 			}
@@ -74,7 +70,7 @@ func EstimateCurrentStop(route common.ChosenRoute) (string, error) {
 			progress := now.Sub(depTime).Seconds() / arrTime.Sub(depTime).Seconds()
 			index := int(progress * float64(len(leg.StopIDs)))
 			if index >= len(leg.StopIDs) {
-				index = len(leg.StopIDs) - 1 // Clamp to last index
+				index = len(leg.StopIDs) - 1
 			}
 			return leg.StopIDs[index], nil
 		}
@@ -87,7 +83,6 @@ func ConvertToChosenRoute(userID string, tflJourney common.TFLJourney) common.Ch
 	var legs []common.RouteLeg
 
 	for _, leg := range tflJourney.Legs {
-		// Extract line info (if any)
 		var lineName, lineID string
 		if len(leg.RouteOptions) > 0 {
 			lineName = leg.RouteOptions[0].LineIdentifier.Name
@@ -127,7 +122,6 @@ func ConvertToChosenRoute(userID string, tflJourney common.TFLJourney) common.Ch
 }
 
 func ConvertToActiveRoute(userID string, route *common.ChosenRoute) *common.ActiveRoute {
-	// Extract all line IDs from the route
 	lineNameSet := make(map[string]struct{})
 	for _, leg := range route.Legs {
 		lineNameSet[leg.LineName] = struct{}{}
@@ -141,5 +135,29 @@ func ConvertToActiveRoute(userID string, route *common.ChosenRoute) *common.Acti
 	return &common.ActiveRoute{
 		UserID:  userID,
 		LineIDs: lineIDs,
+	}
+}
+
+func ConvertUserSavedToChosenRoute(saved *common.UserSavedRoute) common.ChosenRoute {
+	desc := fmt.Sprintf("%s → %s via %s", saved.StartPoint, saved.EndPoint, strings.Join(saved.LineNames, ", "))
+
+	legs := make([]common.RouteLeg, len(saved.LineNames))
+	for i := range saved.LineNames {
+		leg := common.RouteLeg{
+			From:        saved.StartPoint,
+			To:          saved.EndPoint,
+			Mode:        saved.TransportMode,
+			LineName:    saved.LineNames[i],
+			Stops:       []string{saved.StopsNames[i]},
+			Description: fmt.Sprintf("%s via %s", saved.StartPoint, saved.LineNames[i]),
+		}
+		legs[i] = leg
+	}
+
+	return common.ChosenRoute{
+		UserID:        saved.UserID,
+		TotalDuration: saved.EstimatedTime,
+		Description:   desc,
+		Legs:          legs,
 	}
 }

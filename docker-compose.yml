@@ -48,6 +48,7 @@ services:
       - DB_PASSWORD=password
       - DB_NAME=optimaldn
       - DATABASE_URL=postgres://admin:password@postgres:5432/optimaldn
+      - ROUTE_PLANNER_ADDR=route_planner:5002
     depends_on:
       postgres:
         condition: service_healthy
@@ -65,14 +66,14 @@ services:
       - ./src/.env
     environment:
       - RP_PORT=5002
-      - AWS_SHARED_CREDENTIALS_FILE=/app/.aws/credentials
+      - AWS_REGION=us-east-1
     depends_on:
       rabbitmq:
         condition: service_healthy
     ports:
       - "5002:5002"
     volumes:
-      - ~/.aws:/root/.aws:ro
+      - ./src/aws:/root/.aws:ro
 
   notification_service:
     platform: linux/arm64
@@ -82,13 +83,14 @@ services:
     environment:
       - RABBITMQ_ADDR=amqp://guest:guest@rabbitmq:5672/
       - NOTIFICATION_SERVICE_PORT=6000
+      - AWS_REGION=us-east-1
     depends_on:
       rabbitmq:
         condition: service_healthy
     ports:
       - "6000:6000"
     volumes:
-      - ~/.aws:/root/.aws:ro
+      - ./src/aws:/root/.aws:ro
 
   traffic_service:
     platform: linux/arm64
@@ -100,17 +102,18 @@ services:
     environment:
       - TRAFFIC_SERVICE_PORT=5004
       - RABBITMQ_ADDR=amqp://guest:guest@rabbitmq:5672/
-      - INFLUXDB_URL=
-      - INFLUXDB_ORG=
-      - INFLUXDB_TOKEN=
-      - INFLUXDB_BUCKET=
+      - INFLUXDB_URL=https://us-east-1-1.aws.cloud2.influxdata.com
+      - INFLUXDB_ORG=TrafficMonitoring
+      - INFLUXDB_TOKEN=sVUXLvak698BAQHpuxKsvvyvwT35wP610W8ic9VNKN9c60VmSZIbwrPm9iK13pNuUzmy3YAoXH6_Vb6Z7tztCQ==
+      - INFLUXDB_BUCKET=traffic-data
+      - AWS_REGION=us-east-1
     depends_on:
       rabbitmq:
         condition: service_healthy
     ports:
       - "5004:5004"
     volumes:
-      - ~/.aws:/root/.aws:ro
+      - ./src/aws:/root/.aws:ro
 
   api_gateway:
     platform: linux/arm64

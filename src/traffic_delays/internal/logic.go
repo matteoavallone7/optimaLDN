@@ -21,16 +21,13 @@ func ExecuteAndProcessQuery(ctx context.Context, fluxQuery string, alertType str
 			Timestamp: record.Time(),
 		}
 
-		// Populate fields based on alert type
-		if alertType == "CriticalDelay" {
+		if alertType == "Critical Delay" {
 			alert.StatusDescription = record.ValueByKey("status_severity_description").(string)
 			if reason, ok := record.ValueByKey("reason").(string); ok {
 				alert.Reason = reason
 			}
-		} else if alertType == "SuddenServiceWorsening" {
+		} else if alertType == "Sudden Service Worsening" {
 			alert.SeverityDrop = record.ValueByKey("_value").(float64)
-			// For sudden worsening, statusDescription and reason might not be directly relevant
-			// or could be derived in the consumer if needed.
 		}
 
 		alerts = append(alerts, alert)

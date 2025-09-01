@@ -1,4 +1,4 @@
-package manager
+package main
 
 import (
 	"context"
@@ -15,11 +15,9 @@ import (
 	"time"
 )
 
-// InfluxDB client variables
 var influxClient influxdb2.Client
 var influxWriteAPI api.WriteAPIBlocking
 
-// Environment variables for InfluxDB connection and token
 var influxDBUrl string
 var influxOrg string
 var influxBucket string
@@ -30,17 +28,16 @@ var tflAPIKey string
 func init() {
 	log.Println("Lambda cold start: Initializing...")
 
-	// Retrieve TFL API Key directly from environment variable
 	tflAPIKey = os.Getenv("TFL_API_KEY")
 	if tflAPIKey == "" {
 		log.Fatal("TFL_API_KEY environment variable is not set. Please configure it in Lambda settings.")
 	}
+	log.Printf("Using TfL key: %q", tflAPIKey)
 
-	// InfluxDB specific environment variables for connection and token
 	influxDBUrl = os.Getenv("INFLUXDB_URL")
 	influxOrg = os.Getenv("INFLUXDB_ORG")
 	influxBucket = os.Getenv("INFLUXDB_BUCKET")
-	influxDBToken = os.Getenv("INFLUXDB_TOKEN") // Read InfluxDB token directly from environment variable
+	influxDBToken = os.Getenv("INFLUXDB_TOKEN")
 
 	if influxDBUrl == "" || influxOrg == "" || influxBucket == "" || influxDBToken == "" {
 		log.Fatal("One or more InfluxDB environment variables (INFLUXDB_URL, INFLUXDB_ORG, INFLUXDB_BUCKET, INFLUXDB_TOKEN) not set. Please configure them in Lambda settings.")
@@ -54,8 +51,17 @@ func FetchLineStatus() (*common.TfLLineStatusResponse, error) {
 		tflAPIKey,
 	)
 
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error creating request: %w", err)
+	}
+
+	// Add the User-Agent header
+	req.Header.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36")
+
 	client := http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Get(url)
+
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("error calling TfL API: %w", err)
 	}
@@ -83,38 +89,30 @@ func handler(ctx context.Context) error {
 		return fmt.Errorf("failed to fetch TfL status: %w", fetchErr)
 	}
 
-	// 2. Initialize InfluxDB Client if not already initialized (optimizes for warm starts)
-	// The InfluxDB token is now directly available from the global influxDBToken variable
 	if influxClient == nil {
 		influxClient = influxdb2.NewClient(influxDBUrl, influxDBToken)
 		influxWriteAPI = influxClient.WriteAPIBlocking(influxOrg, influxBucket)
 		log.Println("InfluxDB client initialized.")
 	}
-	// Ensure the InfluxDB client is closed after the handler finishes
-	// This flushes any pending writes and cleans up resources.
 	defer influxClient.Close()
 
-	// 3. Transform TfL data into InfluxDB points and write
 	points := []*write.Point{}
 	for _, line := range *tflStatusResponse {
 		for _, status := range line.LineStatuses {
 			// Create a new InfluxDB point for each line status
 			p := influxdb2.NewPointWithMeasurement("tfl_line_status").
-				// Add tags (indexed dimensions for filtering/grouping)
+				// Add tags
 				AddTag("line_id", line.ID).
 				AddTag("line_name", line.Name).
 				AddTag("mode_name", line.ModeName).
-				// Add fields (the actual values you want to measure)
-				AddField("status_severity", float64(status.StatusSeverity)). // Use float64 for numeric measures
+				// Add fields
+				AddField("status_severity", float64(status.StatusSeverity)).
 				AddField("status_severity_description", status.StatusSeverityDescription).
-				// Set the timestamp for the record. time.Now() is appropriate for real-time data.
 				SetTime(time.Now())
 
-			// Add optional reason field if present
 			if status.Reason != "" {
 				p.AddField("reason", status.Reason)
 			}
-			// Add a boolean field to easily identify disrupted lines
 			isDisrupted := status.StatusSeverity != 10 // Assuming 10 means "Good Service"
 			p.AddField("is_disrupted", isDisrupted)
 
@@ -134,7 +132,7 @@ func handler(ctx context.Context) error {
 		log.Println("No TfL status points to write to InfluxDB.")
 	}
 
-	log.Println("TfL status update and storage to Amazon Timestream for InfluxDB completed successfully.")
+	log.Println("TfL status update and storage to InfluxDB completed successfully.")
 	return nil
 }
 

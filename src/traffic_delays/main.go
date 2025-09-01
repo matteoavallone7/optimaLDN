@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
-	"github.com/influxdata/influxdb-client-go/v2/api"
 	"github.com/matteoavallone7/optimaLDN/src/common"
 	"github.com/matteoavallone7/optimaLDN/src/rabbitmq"
 	"github.com/matteoavallone7/optimaLDN/src/traffic_delays/internal"
@@ -28,7 +27,6 @@ var influDBUrl string
 var influOrg string
 var influDBToken string
 var influClient influxdb2.Client
-var influxQueryAPI api.QueryAPI
 
 func failOnError(err error, msg string) {
 	if err != nil {
@@ -53,8 +51,8 @@ func startDelayMonitor(ctx context.Context, newPublisher *rabbitmq.Publisher) {
 			r.status_severity_description == "Part Suspended" or
 			r.status_severity_description == "Closed"
 		  )
+		  |> group(columns: ["line_name", "mode_name"])
 		  |> last() // Get the latest status for each line that matches the criteria
-		  |> group(columns: ["line_name"]) // Group to ensure one result per line
 		  |> keep(columns: ["_time", "line_name", "mode_name", "status_severity_description", "reason"])
 	`, influBucket)
 
@@ -137,13 +135,6 @@ func startDelayMonitor(ctx context.Context, newPublisher *rabbitmq.Publisher) {
 func main() {
 	fmt.Println("Starting Traffic_delays service...")
 
-	/* if os.Getenv("APP_ENV") != "production" {
-		err := godotenv.Load()
-		if err != nil {
-			failOnError(err, "Warning: Could not load .env file. Assuming environment variables are set externally")
-		}
-	} */
-
 	influDBUrl = os.Getenv("INFLUXDB_URL")
 	influOrg = os.Getenv("INFLUXDB_ORG")
 	influBucket = os.Getenv("INFLUXDB_BUCKET")
@@ -155,7 +146,7 @@ func main() {
 
 	if influClient == nil {
 		influClient = influxdb2.NewClient(influDBUrl, influDBToken)
-		internal.InfluxQueryAPI = influClient.QueryAPI(influOrg) // <-- Initialized here
+		internal.InfluxQueryAPI = influClient.QueryAPI(influOrg)
 		log.Println("InfluxDB query client initialized.")
 	}
 	defer influClient.Close()
@@ -177,23 +168,19 @@ func main() {
 
 	var wg sync.WaitGroup
 
-	// Handle OS signals to shut down gracefully (e.g., docker stop)
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-	// Start your delay monitor goroutine
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		startDelayMonitor(ctx, trafficPublisher)
 	}()
 
-	// Wait for signal
 	<-sigChan
 	log.Println("Shutdown signal received.")
 	cancel()
 
-	// Wait for goroutine to finish
 	wg.Wait()
 	log.Println("Application shut down cleanly.")
 

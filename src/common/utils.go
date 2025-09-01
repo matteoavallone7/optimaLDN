@@ -3,39 +3,39 @@ package common
 import "time"
 
 type UserRequest struct {
-	UserID     string
-	StartPoint string
-	EndPoint   string
-	Departure  time.Time
+	UserID     string    `json:"userID"`
+	StartPoint string    `json:"startPoint"`
+	EndPoint   string    `json:"endPoint"`
+	Departure  time.Time `json:"departure"`
 }
 
 type RouteLookup struct {
-	UserID  string
-	RouteID string
+	UserID  string `json:"userID"`
+	RouteID string `json:"routeID"`
 }
 
 type UserSavedRoute struct {
-	RouteID       string
-	UserID        string
-	StartPoint    string
-	EndPoint      string
-	TransportMode string
-	Stops         int
-	EstimatedTime int
-	LineNames     []string
-	StopsNames    []string
+	RouteID       string   `json:"routeID"`
+	UserID        string   `json:"userID"`
+	StartPoint    string   `json:"startPoint"`
+	EndPoint      string   `json:"endPoint"`
+	TransportMode string   `json:"transportMode"`
+	Stops         int      `json:"stops"`
+	EstimatedTime int      `json:"estimatedTime"`
+	LineNames     []string `json:"lineNames"`
+	StopsNames    []string `json:"stopsNames"`
 }
 
 type ActiveRoute struct {
-	UserID  string
-	LineIDs []string
+	UserID  string   `dynamodbav:"userID" json:"userID"`
+	LineIDs []string `dynamodbav:"lineIDs" json:"lineIDs"`
 }
 
 type RouteResult struct {
-	From    string
-	To      string
-	Score   float64
-	Summary string
+	From    string  `json:"from"`
+	To      string  `json:"to"`
+	Score   float64 `json:"score"`
+	Summary string  `json:"summary"`
 }
 
 type TfLAlert struct {
@@ -122,19 +122,19 @@ type Mode struct {
 }
 
 type Path struct {
-	StopPoints []StopPointRef
+	StopPoints []StopPointRef `json:"stopPoints"`
 }
 
 type StopPointRef struct {
-	ID   string
-	Name string
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
 type ChosenRoute struct {
-	UserID        string
-	TotalDuration int
-	Description   string
-	Legs          []RouteLeg
+	UserID        string     `dynamodbav:"userID"`
+	TotalDuration int        `dynamodbav:"totalDuration"`
+	Description   string     `dynamodbav:"description"`
+	Legs          []RouteLeg `dynamodbav:"legs"`
 }
 
 type RouteLeg struct {
@@ -149,20 +149,20 @@ type RouteLeg struct {
 	LineName    string   `json:"lineName"`
 	LineID      string   `json:"lineId"`
 	Stops       []string `json:"stops"`
-	StopIDs     []string
+	StopIDs     []string `json:"stopIds"`
 }
 
 type TimeBandCrowding struct {
-	TimeBand             string
-	PercentageOfBaseLine float64
+	TimeBand             string  `json:"timeBand"`
+	PercentageOfBaseLine float64 `json:"percentageOfBaseLine"`
 }
 
 type CrowdingResp struct {
-	Naptan         string
-	DayOfWeek      string
-	AmPeakTimeBand string
-	PmPeakTimeBand string
-	TimeBands      []TimeBandCrowding
+	Naptan         string             `json:"naptan"`
+	DayOfWeek      string             `json:"dayOfWeek"`
+	AmPeakTimeBand string             `json:"amPeakTimeBand"`
+	PmPeakTimeBand string             `json:"pmPeakTimeBand"`
+	TimeBands      []TimeBandCrowding `json:"timeBands"`
 }
 
 type Status int
@@ -174,16 +174,16 @@ const (
 )
 
 type SavedResp struct {
-	UserID string
-	Status Status
+	UserID string `json:"userID"`
+	Status Status `json:"status"`
 }
 
 type NewRequest struct {
-	UserID string
-	Reason string
+	UserID string `json:"userID"`
+	Reason string `json:"reason"`
 }
 
 type Auth struct {
-	UserID   string
-	Password string
+	UserID   string `json:"userID"`
+	Password string `json:"password"`
 }

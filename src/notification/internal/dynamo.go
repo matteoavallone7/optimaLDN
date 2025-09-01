@@ -15,14 +15,12 @@ import (
 func CheckActiveRoutes(ctx context.Context, lineName string) (bool, []string) {
 	cacheKey := fmt.Sprintf("%s", lineName)
 
-	// 1. Try to get from cache
+	// Try to get from cache
 	if cachedUsers, found := AppCache.Get(cacheKey); found {
 		if userIDs, ok := cachedUsers.([]string); ok && len(userIDs) > 0 {
 			log.Printf("Cache HIT for %s (Line: %s)", cacheKey, lineName)
 			return true, userIDs
 		}
-		// If type assertion fails, it means something unexpected is in cache,
-		// so we'll treat it as a cache miss and re-fetch.
 		log.Printf("Cache entry for %s found but invalid type. Re-fetching.", cacheKey)
 	}
 	log.Printf("Cache MISS for %s (Line: %s). Querying DynamoDB...", cacheKey, lineName)
@@ -83,7 +81,7 @@ func RegisterNewRoute(ctx context.Context, route common.ActiveRoute) error {
 
 func DeleteActiveRoute(ctx context.Context, route common.ActiveRoute) (*common.ActiveRoute, error) {
 	key, err := attributevalue.MarshalMap(map[string]string{
-		"UserID": route.UserID,
+		"userID": route.UserID,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal key: %w", err)
@@ -92,7 +90,7 @@ func DeleteActiveRoute(ctx context.Context, route common.ActiveRoute) (*common.A
 	input := &dynamodb.DeleteItemInput{
 		TableName:    aws.String("ActiveRoutes"),
 		Key:          key,
-		ReturnValues: types.ReturnValueAllOld, // Ensure deleted item is returned
+		ReturnValues: types.ReturnValueAllOld,
 	}
 
 	result, err := DBClient.DeleteItem(ctx, input)

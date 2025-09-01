@@ -24,7 +24,7 @@ WORKDIR /app
 COPY --from=builder /api-gateway .
 
 RUN chmod +x /app/api-gateway
-# This is typically the exposed HTTP server port for the gateway
+
 EXPOSE 8080
 
 ENTRYPOINT ["./api-gateway"]
