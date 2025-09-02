@@ -9,12 +9,8 @@ import (
 	"time"
 )
 
-// MessageHandler defines the signature for a function that processes received messages.
-// It should return true if the message was processed successfully and can be acknowledged,
-// or false if processing failed and the message should be nacked (potentially re-queued or dead-lettered).
 type MessageHandler func(delivery amqp.Delivery) bool
 
-// Consumer represents a RabbitMQ message consumer with a circuit breaker.
 type Consumer struct {
 	channel        *amqp.Channel
 	queueName      string
@@ -23,20 +19,7 @@ type Consumer struct {
 	cbTimeout      time.Duration
 }
 
-// NewConsumer creates a new Consumer instance.
-// It initializes a circuit breaker for consumption operations.
-//
-// Parameters:
-//
-//	ch: The active RabbitMQ channel.
-//	queueName: The name of the queue to consume from.
-//	handler: The function to call for each received message.
-//
-// Returns:
-//
-//	*Consumer: A new Consumer instance.
 func NewConsumer(ch *amqp.Channel, queueName string, handler MessageHandler) *Consumer {
-	// Configure the circuit breaker for consuming operations.
 	settings := gobreaker.Settings{
 		Name:        "RabbitMQConsumer",
 		MaxRequests: 3,                // Max requests allowed in half-open state
@@ -61,9 +44,6 @@ func NewConsumer(ch *amqp.Channel, queueName string, handler MessageHandler) *Co
 	}
 }
 
-// StartConsume begins consuming messages from the configured queue.
-// It uses a circuit breaker to manage the underlying consumption process (e.g., channel issues).
-// This function is blocking and should typically be run in a goroutine.
 func (c *Consumer) StartConsume(ctx context.Context) {
 	log.Printf("Consumer starting to listen on queue: %s", c.queueName)
 
@@ -74,9 +54,7 @@ func (c *Consumer) StartConsume(ctx context.Context) {
 			return
 
 		default:
-			// Execute the consume operation through the circuit breaker.
 			_, err := c.cb.Execute(func() (interface{}, error) {
-				// Register a consumer.
 				msgs, err := c.channel.Consume(
 					c.queueName, // queue name
 					"",          // consumer tag
@@ -91,12 +69,10 @@ func (c *Consumer) StartConsume(ctx context.Context) {
 					return nil, err
 				}
 
-				// Loop indefinitely to process messages from the channel.
 				for {
 					select {
 					case <-ctx.Done():
 						log.Println("Context cancelled during message processing. Stopping inner consume loop.")
-						// Return context.Canceled error to propagate shutdown signal through circuit breaker
 						return nil, context.Canceled
 
 					case d, ok := <-msgs:

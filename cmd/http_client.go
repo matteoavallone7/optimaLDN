@@ -71,7 +71,7 @@ func ViewFavoriteRoutes(userID string) ([]string, error) {
 
 func AcceptSavedRoute(userID string, routeUUID string) error {
 
-	url := fmt.Sprintf("http://localhost:8080/user/saved-route?userID=%s&routeID=%s", userID, routeUUID)
+	url := fmt.Sprintf("http://%suser/saved-route?userID=%s&routeID=%s", baseURL, userID, routeUUID)
 	resp, err := http.Get(url)
 	if err != nil {
 		return fmt.Errorf("failed to fetch route: %w", err)
@@ -88,7 +88,7 @@ func AcceptSavedRoute(userID string, routeUUID string) error {
 		return fmt.Errorf("failed to decode saved route: %w", err)
 	}
 
-	acceptURL := "http://localhost:8080/user/accept-saved-route"
+	acceptURL := fmt.Sprintf("http://%suser/accept-saved-route", baseURL)
 	jsonData, _ := json.Marshal(route)
 	res, err := http.Post(acceptURL, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
@@ -105,7 +105,7 @@ func AcceptSavedRoute(userID string, routeUUID string) error {
 }
 
 func SaveToFavorites(userID string) error {
-	url := "http://localhost:8080/user/save-favorite"
+	url := fmt.Sprintf("http://%suser/save-favorite", baseURL)
 
 	payload := map[string]string{"userID": userID}
 	body, _ := json.Marshal(payload)
@@ -136,7 +136,8 @@ func RecalculateRoute(userID string) error {
 		return fmt.Errorf("failed to encode request: %s", err)
 	}
 
-	resp, err := http.Post("http://localhost:8080/route/recalculate", "application/json", bytes.NewReader(data))
+	url := fmt.Sprintf("http://%sroute/recalculate-route", baseURL)
+	resp, err := http.Post(url, "application/json", bytes.NewReader(data))
 	if err != nil {
 		return fmt.Errorf("HTTP request failed: %s", err)
 	}
@@ -174,7 +175,7 @@ func TerminateRouteFromMenu(userID string) error {
 		Reason: reason,
 	}
 
-	url := "http://localhost:8080/route/terminate"
+	url := fmt.Sprintf("http://%sroute/terminate", baseURL)
 	payload, err := json.Marshal(req)
 	if err != nil {
 		return fmt.Errorf("failed to marshal request: %w", err)
@@ -228,7 +229,8 @@ func StartNewRoute(userID string) error {
 		return fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	resp, err := http.Post("http://localhost:8080/route/request", "application/json", bytes.NewBuffer(reqBody))
+	url := fmt.Sprintf("http://%sroute/request", baseURL)
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(reqBody))
 	if err != nil {
 		return fmt.Errorf("failed to contact API Gateway: %w", err)
 	}
