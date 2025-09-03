@@ -14,6 +14,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -40,9 +41,17 @@ func failOnError(err error, msg string) {
 	}
 }
 
+func normalizeLineName(line string) string {
+	line = strings.ToLower(line)
+	line = strings.ReplaceAll(line, " & ", "-")
+	line = strings.ReplaceAll(line, " ", "-")
+	return line
+}
+
 func handleCriticalDelay(ctx context.Context, payload common.NotificationPayload) {
 	for _, alert := range payload.Alerts {
-		res, userIDs := internal.CheckActiveRoutes(ctx, alert.LineName)
+		normalizedLine := normalizeLineName(alert.LineName)
+		res, userIDs := internal.CheckActiveRoutes(ctx, normalizedLine)
 		if res {
 			for _, userID := range userIDs {
 				msg := fmt.Sprintf("Line %s for user %s is experiencing critical delays.", alert.LineName, userID)
@@ -64,7 +73,8 @@ func handleCriticalDelay(ctx context.Context, payload common.NotificationPayload
 
 func handleSuddenDelay(ctx context.Context, payload common.NotificationPayload) {
 	for _, alert := range payload.Alerts {
-		res, userIDs := internal.CheckActiveRoutes(ctx, alert.LineName)
+		normalizedLine := normalizeLineName(alert.LineName)
+		res, userIDs := internal.CheckActiveRoutes(ctx, normalizedLine)
 		if res {
 			for _, userID := range userIDs {
 				msg := fmt.Sprintf("Line %s for user %s is experiencing sudden worsening delays.", alert.LineName, userID)
