@@ -38,6 +38,10 @@ func CheckActiveRoutes(ctx context.Context, lineName string) (bool, []string) {
 		log.Printf("Failed to scan DynamoDB: %v", err)
 		return false, nil
 	}
+	log.Printf("DynamoDB returned %d items", len(result.Items))
+	for _, item := range result.Items {
+		log.Printf("Item: %+v", item)
+	}
 
 	var routes []common.ActiveRoute
 	err = attributevalue.UnmarshalListOfMaps(result.Items, &routes)
