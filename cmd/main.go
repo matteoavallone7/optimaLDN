@@ -16,7 +16,7 @@ var baseURL string
 func listenToNotifications(userID string, done <-chan struct{}) {
 	var conn *websocket.Conn
 	var err error
-	wsURL := fmt.Sprintf("ws://ec2-54-147-150-231.compute-1.amazonaws.com:8080/ws?userID=%s", userID)
+	wsURL := fmt.Sprintf("ws://ec2-54-226-43-215.compute-1.amazonaws.com:8080/ws?userID=%s", userID)
 	for retries := 0; retries < 3; retries++ {
 		conn, _, err = websocket.DefaultDialer.Dial(wsURL, nil)
 		if err == nil {
