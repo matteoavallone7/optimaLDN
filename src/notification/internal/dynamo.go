@@ -26,11 +26,11 @@ func CheckActiveRoutes(ctx context.Context, lineName string) (bool, []string) {
 	log.Printf("Cache MISS for %s (Line: %s). Querying DynamoDB...", cacheKey, lineName)
 
 	input := &dynamodb.ScanInput{
-		TableName:        aws.String("ActiveRoutes"),
-		FilterExpression: aws.String("contains(lineIDs, :line)"),
-		ExpressionAttributeValues: map[string]types.AttributeValue{
-			":line": &types.AttributeValueMemberS{Value: lineName},
-		},
+		TableName: aws.String("ActiveRoutes"),
+		// FilterExpression: aws.String("contains(lineIDs, :line)"),
+		// ExpressionAttributeValues: map[string]types.AttributeValue{
+		// 	":line": &types.AttributeValueMemberS{Value: lineName},
+		//},
 	}
 
 	result, err := DBClient.Scan(ctx, input)
@@ -40,7 +40,7 @@ func CheckActiveRoutes(ctx context.Context, lineName string) (bool, []string) {
 	}
 	log.Printf("DynamoDB returned %d items", len(result.Items))
 	for _, item := range result.Items {
-		log.Printf("Item: %+v", item)
+		log.Printf("Raw Item: %+v", item)
 	}
 
 	var routes []common.ActiveRoute
@@ -52,7 +52,12 @@ func CheckActiveRoutes(ctx context.Context, lineName string) (bool, []string) {
 
 	var foundUserIDs []string
 	for _, route := range routes {
-		foundUserIDs = append(foundUserIDs, route.UserID)
+		for _, lineID := range route.LineIDs {
+			if lineID == lineName {
+				foundUserIDs = append(foundUserIDs, route.UserID)
+				break
+			}
+		}
 	}
 
 	if len(foundUserIDs) > 0 {
