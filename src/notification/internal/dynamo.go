@@ -33,7 +33,9 @@ func CheckActiveRoutes(ctx context.Context, lineName string) (bool, []string) {
 		//},
 	}
 
+	log.Println(">>> About to call DynamoDB.Scan")
 	result, err := DBClient.Scan(ctx, input)
+	log.Println(">>> Finished calling DynamoDB.Scan")
 	if err != nil {
 		log.Printf("Failed to scan DynamoDB: %v", err)
 		return false, nil
