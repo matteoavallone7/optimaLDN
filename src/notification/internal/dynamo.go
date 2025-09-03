@@ -27,7 +27,7 @@ func CheckActiveRoutes(ctx context.Context, lineName string) (bool, []string) {
 
 	input := &dynamodb.ScanInput{
 		TableName:        aws.String("ActiveRoutes"),
-		FilterExpression: aws.String("LineName = :line"),
+		FilterExpression: aws.String("contains(lineIDs, :line)"),
 		ExpressionAttributeValues: map[string]types.AttributeValue{
 			":line": &types.AttributeValueMemberS{Value: lineName},
 		},
