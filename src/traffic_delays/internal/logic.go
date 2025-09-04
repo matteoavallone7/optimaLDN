@@ -16,18 +16,28 @@ func ExecuteAndProcessQuery(ctx context.Context, fluxQuery string, alertType str
 	for result.Next() {
 		record := result.Record()
 		alert := common.TfLAlert{
-			LineName:  record.ValueByKey("line_name").(string),
-			ModeName:  record.ValueByKey("mode_name").(string),
 			Timestamp: record.Time(),
 		}
 
-		if alertType == "Critical Delay" {
-			alert.StatusDescription = record.ValueByKey("status_severity_description").(string)
-			if reason, ok := record.ValueByKey("reason").(string); ok {
-				alert.Reason = reason
+		if v, ok := record.ValueByKey("line_name").(string); ok {
+			alert.LineName = v
+		}
+		if v, ok := record.ValueByKey("mode_name").(string); ok {
+			alert.ModeName = v
+		}
+
+		switch alertType {
+		case "Critical Delay":
+			if v, ok := record.ValueByKey("status_severity_description").(string); ok {
+				alert.StatusDescription = v
 			}
-		} else if alertType == "Sudden Service Worsening" {
-			alert.SeverityDrop = record.ValueByKey("_value").(float64)
+			if v, ok := record.ValueByKey("reason").(string); ok {
+				alert.Reason = v
+			}
+		case "Sudden Service Worsening":
+			if v, ok := record.ValueByKey("_value").(float64); ok {
+				alert.SeverityDrop = v
+			}
 		}
 
 		alerts = append(alerts, alert)

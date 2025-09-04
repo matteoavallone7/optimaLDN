@@ -51,8 +51,8 @@ func startDelayMonitor(ctx context.Context, newPublisher *rabbitmq.Publisher) {
             r.status_severity_description == "Part Suspended" or
             r.status_severity_description == "Closed"
           )
-		  |> last() // Get the latest status for each line that matches the criteria
           |> group(columns: ["line_name", "mode_name"]) 
+          |> last() // Get the latest status for each line that matches the criteria
 		  |> keep(columns: ["_time", "line_name", "mode_name", "status_severity_description", "reason"])
 	`, influBucket)
 
