@@ -16,7 +16,7 @@ var baseURL string
 func listenToNotifications(userID string, done <-chan struct{}) {
 	var conn *websocket.Conn
 	var err error
-	wsURL := fmt.Sprintf("ws://ec2-18-208-221-23.compute-1.amazonaws.com:8080/ws?userID=%s", userID)
+	wsURL := fmt.Sprintf("ws://ec2-3-85-87-139.compute-1.amazonaws.com:8080/ws?userID=%s", userID)
 	for retries := 0; retries < 3; retries++ {
 		conn, _, err = websocket.DefaultDialer.Dial(wsURL, nil)
 		if err == nil {
@@ -231,7 +231,7 @@ func mainMenu(reader *bufio.Reader) {
 
 func main() {
 	reader := bufio.NewReader(os.Stdin)
-	baseURL = "ec2-18-208-221-23.compute-1.amazonaws.com:8080/"
+	baseURL = "ec2-3-85-87-139.compute-1.amazonaws.com:8080/"
 	setupInterruptHandler()
 
 	mainMenu(reader)
