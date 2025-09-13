@@ -22,7 +22,6 @@ Head to the AWS console, start the Lab and go to the DynamoDB section:
 + Create two new tables needed for the project:
   - the first one called "ActiveRoutes" with userID as partition key;
   - the second one called "ChosenRoutes" with userID as partition key.
-  - 
 Head to the Lambda section and create a new serverless function. After that, you'll need to upload the code to run:
 - Start by cross-compiling serverless.go in the src/lambda directory using:
   ```
