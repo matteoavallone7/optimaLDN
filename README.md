@@ -24,23 +24,24 @@ Head to the AWS console, start the Lab and go to the DynamoDB section:
   - the second one called "ChosenRoutes" with userID as partition key.
   - 
 Head to the Lambda section and create a new serverless function. After that, you'll need to upload the code to run:
-- start by cross-compiling serverless.go in the src/lambda directory using:
+- Start by cross-compiling serverless.go in the src/lambda directory using:
   ```
    GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o bootstrap serverless.go
    zip deployment.zip bootstrap
   ```
   this is needed because otherwise Lambda wouldn't be able to recognize and run the code;
-- upload the .zip in aws lambda
-- add these environmental variables:
+- Upload the .zip in aws lambda
+- Add these environmental variables:
+  ```
   INFLUXDB_URL=https://us-east-1-1.aws.cloud2.influxdata.com
   INFLUXDB_ORG=TrafficMonitoring
   INFLUXDB_TOKEN=sVUXLvak698BAQHpuxKsvvyvwT35wP610W8ic9VNKN9c60VmSZIbwrPm9iK13pNuUzmy3YAoXH6_Vb6Z7tztCQ==
   INFLUXDB_BUCKET=traffic-data
   TFL_API_KEY=3299fcaa4f9446d0ad41668650c2e172
-- test if it works
-- create an EventBridge trigger that makes the function run every 15 minutes (choose a name of your choice)
-- go to CloudWatch -> Logs -> Group logs -> open the link with the name of this function -> chech the logs to see if it works properly (should log
-  something like 'Successfully wrote x lines on InfluxDB'.
+  ```
+- Test if it works
+- Create an EventBridge trigger that makes the function run every 15 minutes (choose a name of your choice)
+- Go to CloudWatch -> Logs -> Group logs -> open the link with the name of this function -> chech the logs to see if it works properly (should log something like 'Successfully wrote x lines on InfluxDB'.)
 
 ### 2) EC2 Setup
 Head to the EC2 section in AWS and create a new EC2 instance with Amazon Linux, save the .pem file and ssh into it using:
@@ -69,10 +70,12 @@ cd optimaLDN
 Once inside the project directory, just run:
 ```
 docker compose up --build -d
+> when finished
+docker compose down
 ```
 
 ### 4) Frontend
-To run the frontend open a terminal locally, cd to the project directory and:
+To run the frontend, first head to main.go file and change the wsURL and baseURL with the EC2 instance public DNS. Then open a terminal locally, cd to the project directory and:
 ```
 cd cmd
 go build -o cmd github.com/matteoavallone7/optimaLDN/cmd
