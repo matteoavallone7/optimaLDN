@@ -14,7 +14,7 @@ COPY test/ ./test
 RUN go work sync
 
 
-RUN CGO_ENABLED=1 GOOS=linux go build -ldflags="-s -w" -o /traffic_delays ./src/traffic_delays/
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /traffic_delays ./src/traffic_delays/
 
 # RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /manager ./src/traffic_delays/manager
 
