@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/matteoavallone7/optimaLDN/src/common"
+	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"time"
@@ -83,11 +85,20 @@ func FetchCrowding(naptan, weekday string) (*common.CrowdingResp, error) {
 }
 
 func NotifyUser(userID, msg string) {
-	_, err := http.PostForm("http://api-gateway/send-notification", url.Values{
+	resp, err := http.PostForm("http://api_gateway:8080/send-notification", url.Values{
 		"userID": {userID},
 		"msg":    {msg},
 	})
 	if err != nil {
+		log.Printf("❌ Failed to send notification for user=%s: %v", userID, err)
 		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		log.Printf("⚠️ Notification API returned status %d: %s", resp.StatusCode, string(body))
+	} else {
+		log.Printf("✅ Notification sent successfully for user=%s", userID)
 	}
 }

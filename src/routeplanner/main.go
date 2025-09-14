@@ -167,12 +167,12 @@ func sharedRecalculationLogic(ctx context.Context, userID string) (*common.Chose
 	if err != nil {
 		return nil, fmt.Errorf("failed to get active route for user %s: %w", userID, err)
 	}
-	activeRoute := internal.ConvertToActiveRoute(userID, chosenRoute)
+	/* activeRoute := internal.ConvertToActiveRoute(userID, chosenRoute)
 	data, _ := json.Marshal(activeRoute)
 	if err = internal.RoutePublisher.Publish(routeTerminated, data, amqp.Table{"Event-Type": "Route Aborted"}); err != nil {
 		return nil, fmt.Errorf("no active route found for user %s", userID)
 	}
-	log.Println("Aborted route notification published successfully.")
+	log.Println("Aborted route notification published successfully.") */
 
 	return chosenRoute, nil
 }
@@ -318,10 +318,10 @@ func loadNapTanFile(filename string) (map[string]string, error) {
 
 	for i, record := range records {
 		if i == 0 {
-			continue // skip header
+			continue
 		}
 		if len(record) < 5 {
-			continue // ensure valid row
+			continue
 		}
 		commonName := record[1]
 		naptanCode := record[4]
@@ -391,28 +391,43 @@ func main() {
 		}
 		route, err3 := sharedRecalculationLogic(ctx, payload.UserID)
 		if err3 != nil {
-			log.Printf("[Route Planner Service] Failed to calculate New Request: %v", err3)
-			return false
+			if strings.Contains(err3.Error(), "no active route found") {
+				log.Printf("[Route Planner Service] No active route for user %s, skipping recalculation.", payload.UserID)
+				return true // ACK the message so it won't be requeued
+			} else {
+				log.Printf("[Route Planner Service] Failed to calculate New Request: %v", err3)
+				return false // only nack/requeue for actual retryable errors
+			}
 		}
 		currentStop, er := internal.EstimateCurrentStop(*route)
 		if er != nil {
 			log.Printf("[Route Planner Service] Failed to estimate Current Stop: %v", er)
 			return false
 		}
-		currentStopNaptan, ok := internal.GetNaptan(currentStop)
-		if !ok {
-			log.Printf("[Route Planner Service] Failed to get Naptan: %v", currentStop)
-			return false
-		}
+		log.Printf("Estimated current stop: %s", currentStop)
+		currentStopNorm := internal.NormalizeStopID(currentStop)
+		log.Printf("Lookup stop: raw=%s normalized=%s", currentStop, currentStopNorm)
 		if len(route.Legs) == 0 {
 			log.Println("No legs in route")
 			return false
 		}
 		lastLeg := route.Legs[len(route.Legs)-1]
 		endPoint := lastLeg.ToID
-		bestJourney, _, err2 := findBestJourney(currentStopNaptan, endPoint, time.Now())
+		bestJourney, _, err2 := findBestJourney(currentStopNorm, endPoint, time.Now())
 		if err2 != nil {
 			log.Printf("Failed to find best journey: %v", err2)
+			return false
+		}
+
+		if err = internal.DeleteChosenRoute(ctx, route.UserID); err != nil {
+			log.Printf("Error deleting old chosen route: %v", err)
+			return false
+		}
+
+		newRoute := internal.ConvertToChosenRoute(route.UserID, *bestJourney)
+
+		if err2 = internal.SaveChosenRoute(ctx, newRoute); err2 != nil {
+			log.Printf("[Route Planner Service] Failed to save new route: %v", err2)
 			return false
 		}
 
@@ -421,11 +436,6 @@ func main() {
 			return false
 		}
 		log.Println("New active route notification published successfully.")
-
-		if err = internal.SaveChosenRoute(ctx, *route); err != nil {
-			log.Printf("Error saving chosen route: %v", err)
-			return false
-		}
 
 		internal.NotifyUser(payload.UserID, "🛑 Critical delay! Route recalculated:\n"+buildSummary(bestJourney))
 
@@ -444,7 +454,7 @@ func main() {
 			server.Accept(listener)
 			if err != nil {
 				log.Printf("RPC Accept error: %v", err)
-				break // or continue, depending on if you want to retry
+				break
 			}
 		}
 	}()

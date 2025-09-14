@@ -3,6 +3,7 @@ package internal
 import (
 	"fmt"
 	"github.com/matteoavallone7/optimaLDN/src/common"
+	"log"
 	"strings"
 	"time"
 )
@@ -49,14 +50,16 @@ func EstimateCurrentStop(route common.ChosenRoute) (string, error) {
 		return "", fmt.Errorf("no legs in the route")
 	}
 	lastLeg := route.Legs[len(route.Legs)-1]
-	journeyEndTime, err := time.Parse(time.RFC3339, lastLeg.EndTime)
+	log.Printf("📌 Last leg start: %s, end: %s", lastLeg.StartTime, lastLeg.EndTime)
+	journeyEndTime, err := time.Parse("2006-01-02T15:04:05", lastLeg.EndTime)
 	if err == nil && now.After(journeyEndTime) {
 		return "", fmt.Errorf("journey already completed")
 	}
 
 	for _, leg := range route.Legs {
-		depTime, err1 := time.Parse(time.RFC3339, leg.StartTime)
-		arrTime, err2 := time.Parse(time.RFC3339, leg.EndTime)
+		loc, _ := time.LoadLocation("Europe/Rome")
+		depTime, err1 := time.ParseInLocation("2006-01-02T15:04:05", leg.StartTime, loc)
+		arrTime, err2 := time.ParseInLocation("2006-01-02T15:04:05", leg.EndTime, loc)
 
 		if err1 != nil || err2 != nil {
 			continue
@@ -160,4 +163,11 @@ func ConvertUserSavedToChosenRoute(saved *common.UserSavedRoute) common.ChosenRo
 		Description:   desc,
 		Legs:          legs,
 	}
+}
+
+func NormalizeStopID(stopID string) string {
+	if strings.HasPrefix(stopID, "940G") {
+		return "9400" + stopID[4:]
+	}
+	return stopID
 }

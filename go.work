@@ -10,4 +10,5 @@ use (
 	./src/api-gateway
 	./cmd
 	./src/lambda
+	./test
 )

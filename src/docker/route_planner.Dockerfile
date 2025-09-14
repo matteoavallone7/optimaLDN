@@ -10,7 +10,7 @@ COPY src/*/go.mod src/*/go.sum ./src/
 COPY src/ ./src/
 COPY cmd/ ./cmd/
 COPY stationCodes.csv ./
-
+COPY test/ ./test
 
 RUN go work sync
 

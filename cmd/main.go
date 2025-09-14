@@ -13,10 +13,10 @@ import (
 
 var baseURL string
 
-func listenToNotifications(userID string, done <-chan struct{}) {
+func listenToNotifications(userID string, done <-chan struct{}, notificationChan chan<- string) {
 	var conn *websocket.Conn
 	var err error
-	wsURL := fmt.Sprintf("ws://ec2-3-85-87-139.compute-1.amazonaws.com:8080/ws?userID=%s", userID)
+	wsURL := fmt.Sprintf("ws://localhost:8080/ws?userID=%s", userID)
 	for retries := 0; retries < 3; retries++ {
 		conn, _, err = websocket.DefaultDialer.Dial(wsURL, nil)
 		if err == nil {
@@ -31,7 +31,6 @@ func listenToNotifications(userID string, done <-chan struct{}) {
 	}
 	defer conn.Close()
 
-	msgChan := make(chan []byte)
 	stopReader := make(chan struct{})
 
 	go func() {
@@ -42,35 +41,16 @@ func listenToNotifications(userID string, done <-chan struct{}) {
 				case <-stopReader:
 					return
 				default:
-					log.Printf("WebSocket read error for user %s: %v", userID, err)
+					log.Printf("WebSocket read error for user %s: %v", userID, err2)
 					return
 				}
 			}
-			msgChan <- msg
+			notificationChan <- string(msg)
 		}
 	}()
 
-	for {
-		select {
-		case msg := <-msgChan:
-			fmt.Println("📬 Notification:", string(msg))
-
-			if strings.Contains(string(msg), "Recalculate?") {
-				answer := readInput("Recalculate route? (y/n): ")
-				if answer == "y" {
-					err3 := RecalculateRoute(userID)
-					if err3 != nil {
-						log.Printf("Error recalculating route for user %s: %v", userID, err3)
-						continue
-					}
-				}
-			}
-		case <-done:
-			// log.Printf("Stopping notification listener.")
-			close(stopReader) // tell reader goroutine to exit
-			return
-		}
-	}
+	<-done
+	close(stopReader)
 }
 
 func readInput(prompt string) string {
@@ -91,6 +71,11 @@ func setupInterruptHandler() {
 }
 
 func sharedLogic(userID string) error {
+	notificationChan := make(chan string, 10)
+	done := make(chan struct{})
+	go listenToNotifications(userID, done, notificationChan)
+	defer close(done)
+
 	if readInput("🗂 Save to favorites? (y/n):") == "y" {
 		err := SaveToFavorites(userID)
 		if err != nil {
@@ -98,6 +83,26 @@ func sharedLogic(userID string) error {
 		}
 		fmt.Println("✅ Route saved to favorites. Now manage your journey.")
 	}
+
+	go func() {
+		for note := range notificationChan {
+			fmt.Printf("\n📬 Notification: %s\n", note)
+
+			if strings.Contains(note, "Sudden service worsening") || strings.Contains(note, "Recalculate?") {
+				answer := readInput("💡 Sudden delay detected. Recalculate route? (y/n): ")
+				if answer == "y" {
+					if err := RecalculateRoute(userID); err != nil {
+						fmt.Println("❌ Failed to recalculate route:", err)
+					} else {
+						fmt.Println("✅ Route recalculated successfully.")
+					}
+				}
+			} else if strings.Contains(note, "Critical delay") {
+				fmt.Println("⚠️ Your route may be affected by a critical delay.")
+			}
+		}
+	}()
+
 	for {
 		choice := readInput("🛑 Terminate journey? (y/n): ")
 		if choice == "y" {
@@ -106,11 +111,11 @@ func sharedLogic(userID string) error {
 			}
 			break
 		}
-
 		fmt.Println("Journey still active. Please terminate before exiting.")
 	}
 
 	return nil
+
 }
 
 func savedUserMenu(userID string, uuids []string) error {
@@ -210,14 +215,10 @@ func mainMenu(reader *bufio.Reader) {
 				fmt.Println("Login failed. Try again.")
 			} else {
 
-				done := make(chan struct{})
-				go listenToNotifications(user, done)
-
 				err = loggedUserMenu(user)
 				if err != nil {
 					fmt.Println("❌ Error:", err)
 				}
-				close(done)
 
 			}
 		case "2":
@@ -231,7 +232,7 @@ func mainMenu(reader *bufio.Reader) {
 
 func main() {
 	reader := bufio.NewReader(os.Stdin)
-	baseURL = "ec2-3-85-87-139.compute-1.amazonaws.com:8080/"
+	baseURL = "localhost:8080/"
 	setupInterruptHandler()
 
 	mainMenu(reader)

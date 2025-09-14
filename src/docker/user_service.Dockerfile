@@ -8,7 +8,7 @@ COPY go.mod go.sum ./
 COPY src/*/go.mod src/*/go.sum ./src/
 COPY src/ ./src/
 COPY cmd/ ./cmd/
-
+COPY test/ ./test
 
 RUN go work sync
 

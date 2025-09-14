@@ -1,0 +1,6 @@
+github.com/matteoavallone7/optimaLDN/src/common v0.0.0-20250904163628-d9c3ae81f2cc h1:5V4xEHnC+ctD9q3d978c+E+xgH0MvDJQQ6PsRyJQgtw=
+github.com/matteoavallone7/optimaLDN/src/common v0.0.0-20250904163628-d9c3ae81f2cc/go.mod h1:a5S5gEoOkBsf6+apheGY3Ur7kD8uJW2n1OYJjFHenm4=
+github.com/rabbitmq/amqp091-go v1.10.0 h1:STpn5XsHlHGcecLmMFCtg7mqq0RnD+zFr4uzukfVhBw=
+github.com/rabbitmq/amqp091-go v1.10.0/go.mod h1:Hy4jKW5kQART1u+JkDTF9YYOQUHXqMuhrgxOEeS7G4o=
+go.uber.org/goleak v1.3.0 h1:2K3zAYmnTNqV73imy9J1T3WC+gmCePx2hEGkimedGto=
+go.uber.org/goleak v1.3.0/go.mod h1:CoHD4mav9JJNrW/WLlf7HGZPjdw8EucARQHekz1X6bE=

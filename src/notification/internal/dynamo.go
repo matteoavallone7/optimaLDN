@@ -90,9 +90,9 @@ func RegisterNewRoute(ctx context.Context, route common.ActiveRoute) error {
 	return nil
 }
 
-func DeleteActiveRoute(ctx context.Context, route common.ActiveRoute) (*common.ActiveRoute, error) {
+func DeleteActiveRoute(ctx context.Context, userID string) (*common.ActiveRoute, error) {
 	key, err := attributevalue.MarshalMap(map[string]string{
-		"userID": route.UserID,
+		"userID": userID,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal key: %w", err)
@@ -106,11 +106,11 @@ func DeleteActiveRoute(ctx context.Context, route common.ActiveRoute) (*common.A
 
 	result, err := DBClient.DeleteItem(ctx, input)
 	if err != nil {
-		return nil, fmt.Errorf("failed to delete active route for user %s: %w", route.UserID, err)
+		return nil, fmt.Errorf("failed to delete active route for user %s: %w", userID, err)
 	}
 
 	if len(result.Attributes) == 0 {
-		log.Printf("Info: No active route found for user %s to delete.", route.UserID)
+		log.Printf("Info: No active route found for user %s to delete.", userID)
 		return nil, nil
 	}
 

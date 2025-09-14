@@ -230,11 +230,11 @@ func main() {
 		var payload common.NewRequest
 		err2 := json.Unmarshal(delivery.Body, &payload)
 		if err2 != nil {
-			log.Printf("[Route Planner Service] Failed to unmarshal New Request: %v", err2)
+			log.Printf("[User Service] Failed to unmarshal New Request: %v", err2)
 			return false
 		}
 
-		logic.NotifyUser(payload.UserID, "⚠️ Sudden delay on your route. Recalculate? (y/n)")
+		logic.NotifyUser(payload.UserID, "⚠️ Sudden service worsening on your route. Recalculate? (y/n)")
 
 		return true
 	}

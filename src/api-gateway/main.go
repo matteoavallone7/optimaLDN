@@ -52,6 +52,7 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 func SendToUser(userID, message string) error {
 	conn, ok := clients[userID]
 	if !ok {
+		log.Printf("User %s not connected", userID)
 		return fmt.Errorf("user %s not connected", userID)
 	}
 	return conn.WriteMessage(websocket.TextMessage, []byte(message))
@@ -60,9 +61,13 @@ func SendToUser(userID, message string) error {
 func sendNotificationHandler(w http.ResponseWriter, r *http.Request) {
 	userID := r.FormValue("userID")
 	msg := r.FormValue("msg")
+	log.Printf("📩 Attempting to send notification to user=%s: %s", userID, msg) // debug
 	if err := SendToUser(userID, msg); err != nil {
+		log.Printf("❌ Failed to send to user %s: %v", userID, err)
 		http.Error(w, "Failed to send", 500)
+		return
 	}
+	log.Printf("✅ Notification sent to user=%s", userID)
 }
 
 // initClients establishes persistent connections to backend services.

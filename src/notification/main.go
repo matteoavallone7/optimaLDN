@@ -54,6 +54,10 @@ func handleCriticalDelay(ctx context.Context, payload common.NotificationPayload
 		res, userIDs := internal.CheckActiveRoutes(ctx, normalizedLine)
 		if res {
 			for _, userID := range userIDs {
+				_, err1 := internal.DeleteActiveRoute(ctx, userID)
+				if err1 != nil {
+					log.Printf("Error deleting active routes: %v", err1)
+				}
 				msg := fmt.Sprintf("Line %s for user %s is experiencing critical delays.", alert.LineName, userID)
 				req := common.NewRequest{
 					UserID: userID,
@@ -160,7 +164,7 @@ func main() {
 		var payload common.NotificationPayload
 		err1 := json.Unmarshal(delivery.Body, &payload)
 		failOnError(err1, "Failed to unmarshal notification payload")
-		log.Printf("[Notification Service] Received Payload: %s, Alerts: %s, Generated: %s", payload.AlertType, len(payload.Alerts), payload.GeneratedAt)
+		log.Printf("[Notification Service] Received Payload: %s, Alerts: %d, Generated: %s", payload.AlertType, len(payload.Alerts), payload.GeneratedAt)
 		switch payload.AlertType {
 		case "CriticalDelay":
 			handleCriticalDelay(ctx, payload)
@@ -202,7 +206,7 @@ func main() {
 			log.Printf("Stored active route for user %s.", req.UserID)
 
 		case "active.route.terminated":
-			deletedRoute, err := internal.DeleteActiveRoute(ctx, req)
+			deletedRoute, err := internal.DeleteActiveRoute(ctx, req.UserID)
 			if err != nil {
 				log.Printf("Failed to delete active route for user %s: %v", req.UserID, err)
 				return false
