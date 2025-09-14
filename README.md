@@ -44,7 +44,7 @@ Head to the Lambda section and create a new serverless function. After that, you
 - Go to CloudWatch -> Logs -> Group logs -> open the link with the name of this function -> chech the logs to see if it works properly (should log something like 'Successfully wrote x lines on InfluxDB'.)
 
 ### 2) EC2 Setup
-Head to the EC2 section in AWS and create a new EC2 instance with Amazon Linux, save the .pem file and ssh into it using:
+Head to the EC2 section in AWS and create a new EC2 instance with Amazon Linux, create 3 security rules to allow inbound traffic to ports 15672, 8080 and 5672, then save the .pem file and ssh into it using:
 ```
 ssh -i <file.pem> ec2-user@<Public-IP-EC2>
 ```
@@ -83,7 +83,7 @@ go build -o cmd github.com/matteoavallone7/optimaLDN/cmd
 ```
 
 ### 5) Test
-To run the Recalculate Route test (while the app is running), open a new terminal and cd to the test directory:
+To run the Recalculate Route test (while the app is running), make sure to include the current ec2 public dns to connect to rabbitmq, then open a new terminal and cd to the test directory:
 ```
 cd test
 go run .
