@@ -75,7 +75,7 @@ docker compose down
 ```
 
 ### 4) Frontend
-To run the frontend, first head to main.go file and change the wsURL and baseURL with the EC2 instance public DNS. Then open a terminal locally, cd to the project directory and:
+To run the frontend, first head to main.go file and change the baseURL with the EC2 instance public DNS. Then open a terminal locally, cd to the project directory and:
 ```
 cd cmd
 go build -o cmd github.com/matteoavallone7/optimaLDN/cmd
