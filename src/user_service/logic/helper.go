@@ -32,7 +32,7 @@ func ConvertToUserSavedRoute(userID string, chosen common.ChosenRoute) common.Us
 }
 
 func NotifyUser(userID, msg string) {
-	resp, err := http.PostForm("http://api-gateway:8080/send-notification", url.Values{
+	resp, err := http.PostForm("http://api_gateway:8080/send-notification", url.Values{
 		"userID": {userID},
 		"msg":    {msg},
 	})
