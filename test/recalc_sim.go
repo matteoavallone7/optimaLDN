@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	rabbitURL := "amqp://guest:guest@ec2-3-89-249-117.compute-1.amazonaws.com:5672/"
+	rabbitURL := "amqp://guest:guest@ec2-3-80-26-146.compute-1.amazonaws.com:5672/"
 
 	conn, err := amqp091.Dial(rabbitURL)
 	if err != nil {

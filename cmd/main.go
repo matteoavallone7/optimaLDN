@@ -232,7 +232,7 @@ func mainMenu(reader *bufio.Reader) {
 
 func main() {
 	reader := bufio.NewReader(os.Stdin)
-	baseURL = "ec2-3-89-249-117.compute-1.amazonaws.com:8080/"
+	baseURL = "ec2-3-80-26-146.compute-1.amazonaws.com:8080/"
 	setupInterruptHandler()
 
 	mainMenu(reader)
